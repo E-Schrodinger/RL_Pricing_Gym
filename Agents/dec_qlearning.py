@@ -91,7 +91,7 @@ def adaption_phase(game, s_hat, a_hat, s_prime):
 def simulate_game(game, batch_size=1000):
     """Simulate game using Sample-Batch Temporal-Difference Learning"""
     s = game.s0
-    stable = 0
+    stable_count = 0
     
     # Initialize q_act(s, a) = q_val(s, a) randomly
     game.Q_act = np.random.rand(*game.Q_act.shape)
@@ -108,27 +108,39 @@ def simulate_game(game, batch_size=1000):
         optimal_actions = np.argmax(game.Q_act[n], axis=-1)
         game.X[n][np.arange(game.sdim[0]), np.arange(game.sdim[1]), optimal_actions] += 1 - game.epsilon
     
+    # Store previous Q_act for comparison
+    prev_Q_act = game.Q_act.copy()
+    
     # Iterate until convergence or maximum iterations
     for t in range(int(game.tmax)):
-
+        print(t)
 
         # Interaction phase
         for _ in range(batch_size):
             a = pick_strategies(game, s, t)
             pi = game.PI[tuple(a)]
             s1 = a
-            game.Q_val, stable = update_q(game, s, a, s1, pi, stable)
+            game.Q_val, _ = update_q(game, s, a, s1, pi, 0)  # We don't use the stable return value here
             s = s1
-            
+        
         # Adaption phase
         for s_hat in np.ndindex(game.sdim):
             for a_hat in np.ndindex((game.k,) * game.n):
                 for s_prime in np.ndindex(game.sdim):
                     adaption_phase(game, s_hat, a_hat, s_prime)
         
-        # Check for convergence (you can implement your own convergence check)
-        if stable > game.tstable:
-            print('Converged!')
+        # Check for stability
+        if np.allclose(game.Q_act, prev_Q_act, rtol=1e-5, atol=1e-8):
+            stable_count += 1
+        else:
+            stable_count = 0
+        
+        # Update prev_Q_act for next iteration
+        prev_Q_act = game.Q_act.copy()
+        
+        # Check for convergence
+        if stable_count >= game.tstable:
+            print(f'Converged after {t+1} iterations!')
             break
     
     if t == game.tmax - 1:
@@ -138,5 +150,5 @@ def simulate_game(game, batch_size=1000):
     
     
 
-    return game
+
 

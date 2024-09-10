@@ -48,7 +48,7 @@ class IRP(object):
         self.mu = kwargs.get('mu', 0.25)
         self.k = kwargs.get('k', 15)
         self.tstable = kwargs.get('tstable', 1e2)
-        self.tmax = kwargs.get('tstable', 1e4)
+        self.tmax = kwargs.get('tmax', 1e4)
 
         self.epsilon = kwargs.get('epsilon', 0.1)
 
