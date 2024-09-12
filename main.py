@@ -1,5 +1,5 @@
 from Environments.IRP import IRP
-from Agents.dec_qlearning import simulate_game
+from Agents.qlearning import Q_Learning
 
 
 def linear_demand(p):
@@ -7,8 +7,11 @@ def linear_demand(p):
     return d
 
 # Init algorithm
-game = IRP(tmax = 10000, tstable = 100, k = 4)
+game = IRP(tmax = 100000, tstable = 1000)
 print(f'Max val = {game.tmax}')
 
+Agent1 = Q_Learning(game)
+Agent2 = Q_Learning(game)
+
 # Compute equilibrium
-game_equilibrium = simulate_game(game, batch_size= 2)
+game.simulate_game(Agent1, Agent2, game)

@@ -5,6 +5,7 @@ Model of algorithms and competition
 import numpy as np
 from itertools import product
 from scipy.optimize import fsolve
+import sys
 
 
 class IRP(object):
@@ -41,7 +42,6 @@ class IRP(object):
         self.n = kwargs.get('n', 2)
         self.alpha = kwargs.get('alpha', 0.15)
         self.beta = kwargs.get('beta', 4e-6)
-        self.delta = kwargs.get('delta', 0.95)
         self.c = kwargs.get('c', 1)
         self.a = kwargs.get('a', 2)
         self.a0 = kwargs.get('a0', 0)
@@ -50,8 +50,6 @@ class IRP(object):
         self.tstable = kwargs.get('tstable', 1e2)
         self.tmax = kwargs.get('tmax', 1e4)
 
-        self.epsilon = kwargs.get('epsilon', 0.1)
-
         self.dem_function = dem_function
 
         # Derived properties
@@ -59,13 +57,12 @@ class IRP(object):
         self.p_minmax = self.compute_p_competitive_monopoly()
         self.A = self.init_actions()
         self.PI = self.init_PI()
-        self.Q = self.init_Q()
 
-        self.Q_val = self.init_Q_val()
-        self.Q_act = self.init_Q_act()
-        self.trans = self.init_trans()
-        self.num = self.init_num()
-        self.reward = self.init_reward()
+        # self.Q_val = self.init_Q_val()
+        # self.Q_act = self.init_Q_act()
+        # self.trans = self.init_trans()
+        # self.num = self.init_num()
+        # self.reward = self.init_reward()
 
         
 
@@ -128,38 +125,79 @@ class IRP(object):
             p = np.asarray(game.A[np.asarray(s)])
             PI[s] = game.compute_profits(p)
         return PI
+    
+    def check_convergence(self, game, t, stable1, stable2):
+        """Check if game converged"""
+        if (t % game.tstable == 0) & (t > 0):
+            sys.stdout.write("\rt=%i" % t)
+            sys.stdout.flush()
+        if stable1 > game.tstable and stable2 > game.tstable:
+            print('Both Algorithms Converged!')
+            return True
+        if t == game.tmax-1:
+            if stable1 > game.tstable:
+                print("Algorithm 1 : Converged. Algorithm 2: Not Converged")
+                return True
+            elif stable2 > game.tstable:
+                print("Algorithm 1 : Not Converged. Algorithm 2: Converged")
+                return True
+            
+            print('ERROR! Not Converged!')
+            return True
+        return False
+    
+    def simulate_game(self, Agent1, Agent2, game):
+        s = game.s0
+        stable1 = 0
+        stable2 = 0
+        for t in range(int(game.tmax)):
+            a1 = Agent1.pick_strategies(game, s, t)[0]
+            a2 = Agent2.pick_strategies(game, s[::-1], t)[0]
+            a = (a1, a2)
+            pi1 = game.PI[a]
+            pi2 = game.PI[a[::-1]]
+            s1 = a
+            _, stable1 = Agent1.update_function(game, s, a, s1, pi1, stable1, t)
+            _, stable2 = Agent2.update_function(game, s, a[::-1], s1[::-1], pi2, stable2, t)
+            s = s1
+            if game.check_convergence(game, t, stable1, stable2):
+                print(f"Q-values difference: {np.max(np.abs(Agent1.Q - Agent2.Q[::-1, ::-1]))}")
+                break
+        return game
 
-    def init_Q(game):
-        """Initialize Q function (n x #s x k)"""
-        Q = np.zeros((game.n,) + game.sdim + (game.k,))
-        for n in range(game.n):
-            pi = np.mean(game.PI[:, :, n], axis=1 - n)
-            Q[n] = np.tile(pi, game.sdim + (1,)) / (1 - game.delta)
-        return Q
+
+
+    # def init_Q(game):
+    #     """Initialize Q function (n x #s x k)"""
+    #     Q = np.zeros((game.n,) + game.sdim + (game.k,))
+    #     for n in range(game.n):
+    #         pi = np.mean(game.PI[:, :, n], axis=1 - n)
+    #         Q[n] = np.tile(pi, game.sdim + (1,)) / (1 - game.delta)
+    #     return Q
     
-    def init_Q_val(game):
-        """Initialize Q function (n x #s x k)"""
-        Q = np.zeros((game.n,) + game.sdim + (game.k,))
-        return Q
+    # def init_Q_val(game):
+    #     """Initialize Q function (n x #s x k)"""
+    #     Q = np.zeros((game.n,) + game.sdim + (game.k,))
+    #     return Q
     
-    def init_Q_act(game):
-        """Initialize Q function (n x #s x k)"""
-        Q = np.zeros((game.n,) + game.sdim + (game.k,))
-        return Q
+    # def init_Q_act(game):
+    #     """Initialize Q function (n x #s x k)"""
+    #     Q = np.zeros((game.n,) + game.sdim + (game.k,))
+    #     return Q
     
-    def init_trans(game):
-        """Initialize transition function (n x #s x #s x k)"""
-        Q = np.zeros((game.n,) + game.sdim + game.sdim + (game.k,))
-        return Q
+    # def init_trans(game):
+    #     """Initialize transition function (n x #s x #s x k)"""
+    #     Q = np.zeros((game.n,) + game.sdim + game.sdim + (game.k,))
+    #     return Q
     
-    def init_num(game):
-        """Initialize Q function (n x #s x k)"""
-        Q = np.zeros((game.n,) + game.sdim + (game.k,))
-        return Q
+    # def init_num(game):
+    #     """Initialize Q function (n x #s x k)"""
+    #     Q = np.zeros((game.n,) + game.sdim + (game.k,))
+    #     return Q
     
-    def init_reward(game):
-        """Initialize Q function (n x #s x k)"""
-        Q = np.zeros((game.n,) + game.sdim + (game.k,))
-        return Q
+    # def init_reward(game):
+    #     """Initialize Q function (n x #s x k)"""
+    #     Q = np.zeros((game.n,) + game.sdim + (game.k,))
+    #     return Q
     
     
