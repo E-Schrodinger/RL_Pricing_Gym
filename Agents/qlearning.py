@@ -4,42 +4,8 @@ Q-learning Functions
 
 import sys
 import numpy as np
+import copy
 
-
-
-
-
-
-
-# def check_convergence(game, t, stable):
-#     """Check if game converged"""
-#     if (t % game.tstable == 0) & (t > 0):
-#         sys.stdout.write("\rt=%i" % t)
-#         sys.stdout.flush()
-#     if stable > game.tstable:
-#         print('Converged!')
-#         return True
-#     if t == game.tmax:
-#         print('ERROR! Not Converged!')
-#         return True
-#     return False
-
-
-# def simulate_game(game):
-#     """Simulate game"""
-#     s = game.s0
-#     stable = 0
-#     # Iterate until convergence
-#     for t in range(int(game.tmax)):
-#         a = pick_strategies(game, s, t)
-#         pi = game.PI[tuple(a)]
-#         s1 = a
-#         game.Q, stable = update_q(game, s, a, s1, pi, stable)
-#         s = s1
-#         if check_convergence(game, t, stable):
-#             print(game.Q)
-#             break
-#     return game
 
 class Q_Learning:
     def __init__(self, game, **kwargs):
@@ -60,27 +26,26 @@ class Q_Learning:
     def pick_strategies(self, game, s, t):
         """Pick strategies by exploration vs exploitation"""
         a = np.zeros(game.n).astype(int)
-        pr_explore = max(self.epsilon, np.exp(- t * game.beta))
+        pr_explore = np.exp(- t * game.beta)
         e = (pr_explore > np.random.rand(game.n))
-        for n in range(game.n):
+        for n in range(1):
             if e[n]:
                 a[n] = np.random.randint(0, game.k)
             else:
                 a[n] = np.argmax(self.Q[(n,) + tuple(s)])
         return a
     
-    def update_function(self, game, s, a, s1, pi, stable, t):
+    def update_function(self, game, s, a, s1, pi, stable, t, tol = 1e-1):
         """Update Q matrix"""
-        for n in range(game.n):
+        for n in range(1):
             subj_state = (n,) + tuple(s) + (a[n],)
+            old_q = self.Q[0].copy()
             old_value = self.Q[subj_state]
             max_q1 = np.max(self.Q[(n,) + tuple(s1)])
             new_value = pi[n] + self.delta * max_q1
-            old_argmax = np.argmax(self.Q[(n,) + tuple(s)])
             self.Q[subj_state] = (1 - game.alpha) * old_value + game.alpha * new_value
             # Check stability
-            new_argmax = np.argmax(self.Q[(n,) + tuple(s)])
-            same_argmax = (old_argmax == new_argmax)
-            stable = (stable + same_argmax) * same_argmax
+            same_q = np.allclose(old_q, self.Q[0], tol)
+            stable = (stable + same_q) * same_q
         return self.Q, stable
 

@@ -129,7 +129,7 @@ class IRP(object):
     def check_convergence(self, game, t, stable1, stable2):
         """Check if game converged"""
         if (t % game.tstable == 0) & (t > 0):
-            sys.stdout.write("\rt=%i" % t)
+            sys.stdout.write("\rt=%i " % t)
             sys.stdout.flush()
         if stable1 > game.tstable and stable2 > game.tstable:
             print('Both Algorithms Converged!')
@@ -147,57 +147,40 @@ class IRP(object):
         return False
     
     def simulate_game(self, Agent1, Agent2, game):
+        p_competitive, p_monopoly = self.compute_p_competitive_monopoly()
+
         s = game.s0
         stable1 = 0
         stable2 = 0
+        stable_state0 = 0
+        stable_state1 = 0
         for t in range(int(game.tmax)):
+           # print(f"t = {t} ----------------------------------------------------------------------------------------")
             a1 = Agent1.pick_strategies(game, s, t)[0]
             a2 = Agent2.pick_strategies(game, s[::-1], t)[0]
             a = (a1, a2)
+            # print(a)
             pi1 = game.PI[a]
             pi2 = game.PI[a[::-1]]
             s1 = a
+            same_state0 = (s[0] == s1[0])
+            stable_state0 = (stable_state0 + same_state0)*same_state0
+
+            same_state1 = (s[1] == s1[1])
+            stable_state1 = (stable_state1 + same_state1)*same_state1
+
             _, stable1 = Agent1.update_function(game, s, a, s1, pi1, stable1, t)
-            _, stable2 = Agent2.update_function(game, s, a[::-1], s1[::-1], pi2, stable2, t)
+            _, stable2 = Agent2.update_function(game, s[::-1], a[::-1], s1[::-1], pi2, stable2, t)
             s = s1
             if game.check_convergence(game, t, stable1, stable2):
-                print(f"Q-values difference: {np.max(np.abs(Agent1.Q - Agent2.Q[::-1, ::-1]))}")
+                # print(f"Q-values difference: {np.max(np.abs(Agent1.Q[0] - Agent2.Q[0]))}")
+                print(f"Has been in state {s} for the last {[stable_state0, stable_state1]} iterations.")
+                print(f"Competitive Price: {p_competitive}")
+                print(f"Monopoly Price: {p_monopoly}")
+
+                # print(Agent1.Q[0])
+                # print(Agent2.Q[0])
                 break
-        return game
+        return game, s
 
-
-
-    # def init_Q(game):
-    #     """Initialize Q function (n x #s x k)"""
-    #     Q = np.zeros((game.n,) + game.sdim + (game.k,))
-    #     for n in range(game.n):
-    #         pi = np.mean(game.PI[:, :, n], axis=1 - n)
-    #         Q[n] = np.tile(pi, game.sdim + (1,)) / (1 - game.delta)
-    #     return Q
-    
-    # def init_Q_val(game):
-    #     """Initialize Q function (n x #s x k)"""
-    #     Q = np.zeros((game.n,) + game.sdim + (game.k,))
-    #     return Q
-    
-    # def init_Q_act(game):
-    #     """Initialize Q function (n x #s x k)"""
-    #     Q = np.zeros((game.n,) + game.sdim + (game.k,))
-    #     return Q
-    
-    # def init_trans(game):
-    #     """Initialize transition function (n x #s x #s x k)"""
-    #     Q = np.zeros((game.n,) + game.sdim + game.sdim + (game.k,))
-    #     return Q
-    
-    # def init_num(game):
-    #     """Initialize Q function (n x #s x k)"""
-    #     Q = np.zeros((game.n,) + game.sdim + (game.k,))
-    #     return Q
-    
-    # def init_reward(game):
-    #     """Initialize Q function (n x #s x k)"""
-    #     Q = np.zeros((game.n,) + game.sdim + (game.k,))
-    #     return Q
-    
     
