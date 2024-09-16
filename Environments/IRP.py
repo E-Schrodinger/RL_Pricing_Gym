@@ -58,12 +58,6 @@ class IRP(object):
         self.A = self.init_actions()
         self.PI = self.init_PI()
 
-        # self.Q_val = self.init_Q_val()
-        # self.Q_act = self.init_Q_act()
-        # self.trans = self.init_trans()
-        # self.num = self.init_num()
-        # self.reward = self.init_reward()
-
         
 
     def demand(self, p):
@@ -126,6 +120,11 @@ class IRP(object):
             PI[s] = game.compute_profits(p)
         return PI
     
+    def show_stats(self):
+        p_competitive, p_monopoly = self.compute_p_competitive_monopoly()
+        print(f"Competitive Price: {p_competitive}")
+        print(f"Monopoly Price: {p_monopoly}")
+    
     def check_convergence(self, game, t, stable1, stable2):
         """Check if game converged"""
         if (t % game.tstable == 0) & (t > 0):
@@ -147,18 +146,20 @@ class IRP(object):
         return False
     
     def simulate_game(self, Agent1, Agent2, game):
-        p_competitive, p_monopoly = self.compute_p_competitive_monopoly()
 
         s = game.s0
         stable1 = 0
         stable2 = 0
         stable_state0 = 0
         stable_state1 = 0
+        all_visited_states = []
+        all_actions = []
         for t in range(int(game.tmax)):
            # print(f"t = {t} ----------------------------------------------------------------------------------------")
             a1 = Agent1.pick_strategies(game, s, t)[0]
             a2 = Agent2.pick_strategies(game, s[::-1], t)[0]
             a = (a1, a2)
+            all_actions.append(a)
             # print(a)
             pi1 = game.PI[a]
             pi2 = game.PI[a[::-1]]
@@ -172,15 +173,17 @@ class IRP(object):
             _, stable1 = Agent1.update_function(game, s, a, s1, pi1, stable1, t)
             _, stable2 = Agent2.update_function(game, s[::-1], a[::-1], s1[::-1], pi2, stable2, t)
             s = s1
+            all_visited_states.append(s1)
             if game.check_convergence(game, t, stable1, stable2):
                 # print(f"Q-values difference: {np.max(np.abs(Agent1.Q[0] - Agent2.Q[0]))}")
-                print(f"Has been in state {s} for the last {[stable_state0, stable_state1]} iterations.")
-                print(f"Competitive Price: {p_competitive}")
-                print(f"Monopoly Price: {p_monopoly}")
+                # print(f"Has been in state {s} for the last {[stable_state0, stable_state1]} iterations.")
+                # print(f"Competitive Price: {p_competitive}")
+                # print(f"Monopoly Price: {p_monopoly}")
+                # print(all_visited_states[-5:])
 
                 # print(Agent1.Q[0])
                 # print(Agent2.Q[0])
                 break
-        return game, s
+        return game, s, all_visited_states, all_actions
 
     

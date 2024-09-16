@@ -23,10 +23,14 @@ class Q_Learning:
             Q[n] = np.tile(pi, game.sdim + (1,)) / (1 - self.delta)
         return Q
     
+    def reset(self, game):
+        self.Q = self.init_Q(game)
+    
     def pick_strategies(self, game, s, t):
         """Pick strategies by exploration vs exploitation"""
         a = np.zeros(game.n).astype(int)
         pr_explore = np.exp(- t * game.beta)
+        # pr_explore = 0.1
         e = (pr_explore > np.random.rand(game.n))
         for n in range(1):
             if e[n]:
