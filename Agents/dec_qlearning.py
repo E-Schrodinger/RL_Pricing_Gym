@@ -11,18 +11,19 @@ class Batch_SARSA:
 
         self.delta = kwargs.get('delta', 0.95)
         self.epsilon = kwargs.get('epsilon', 0.1)
+        self.beta = kwargs.get('beta', 4e-6)
         self.batch_size = kwargs.get('batch_size', 1000)
 
         
-        self.Q_act = self.init_Q_act(game)
-        self.Q_val = self.Q_act.copy()
+        self.Q = self.init_Q_act(game)
+        self.Q_val = self.Q.copy()
         self.trans = self.init_trans(game)
         self.num = self.init_num(game)
         self.reward = self.init_reward(game)
 
-        self.X = np.full(self.Q_act.shape, self.epsilon / game.k)
+        self.X = np.full(self.Q.shape, self.epsilon / game.k)
         for n in range(1):
-            optimal_actions = np.argmax(self.Q_act[n], axis=-1)
+            optimal_actions = np.argmax(self.Q[n], axis=-1)
             self.X[n][np.arange(game.sdim[0]), np.arange(game.sdim[1]), optimal_actions] += 1 - self.epsilon
 
 
@@ -50,22 +51,30 @@ class Batch_SARSA:
         Q = np.zeros((game.n,) + game.sdim + (game.k,))
         return Q
     
+    def reset(self, game):
+        self.Q = self.init_Q_act(game)
+        self.Q_val = self.Q.copy()
+        self.trans = self.init_trans(game)
+        self.num = self.init_num(game)
+        self.reward = self.init_reward(game)
+
+    
     def pick_strategies(self, game, s, t):
         """Pick strategies by exploration vs exploitation"""
         a = np.zeros(game.n).astype(int)
-        pr_explore = np.exp(- t * game.beta)
+        pr_explore = np.exp(- t * self.beta)
         e = (pr_explore > np.random.rand(game.n))
         for n in range(1):
             if e[n]:
                 a[n] = np.random.randint(0, game.k)
             else:
-                a[n] = np.argmax(self.Q_act[(n,) + tuple(s)])
+                a[n] = np.argmax(self.Q[(n,) + tuple(s)])
         return a
     
     def X_function(self, game,s, a):
         for n in range(game.n):
             probabilities = np.zeros(game.n)
-            optimal = np.argmax(self.Q_act[(n,) + tuple(s)])
+            optimal = np.argmax(self.Q[(n,) + tuple(s)])
             if a == optimal:
                 probabilities[n] = self.epsilon/game.k + 1 - self.epsilon
             else:
@@ -87,15 +96,15 @@ class Batch_SARSA:
                 v_hat += p_b * self.Q_val[(n,) + tuple(s_prime) + (b,)]
             
             # Update Q_act
-            self.Q_act[state] = (1 - game.alpha) * self.Q_act[state] + game.alpha * (r_hat + self.delta * v_hat)
+            self.Q[state] = (1 - game.alpha) * self.Q[state] + game.alpha * (r_hat + self.delta * v_hat)
             
             # Set x(a|s) as epsilon-greedy strategy
-            optimal_action = np.argmax(self.Q_act[(n,) + tuple(s_hat)])
+            optimal_action = np.argmax(self.Q[(n,) + tuple(s_hat)])
             self.X[state] = self.epsilon / game.k
             self.X[(n,) + tuple(s_hat) + (optimal_action,)] += 1 - self.epsilon
             
             # Set Q_val
-            self.Q_val[state] = self.Q_act[state]
+            self.Q_val[state] = self.Q[state]
             
             # Reset counters
             self.trans[(n,) + tuple(s_prime) + tuple(s_hat) + (a_hat[n],)] = 0
@@ -132,6 +141,6 @@ class Batch_SARSA:
             self.num.fill(0)
             self.reward.fill(0)
        
-        return self.Q_act, stable
+        return self.Q, stable
 
 

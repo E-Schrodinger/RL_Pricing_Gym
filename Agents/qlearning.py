@@ -12,6 +12,7 @@ class Q_Learning:
 
         self.delta = kwargs.get('delta', 0.95)
         self.epsilon = kwargs.get('epsilon', 0.1)
+        self.beta = kwargs.get('beta', 4e-6)
 
         self.Q = self.init_Q(game)
 
@@ -29,7 +30,7 @@ class Q_Learning:
     def pick_strategies(self, game, s, t):
         """Pick strategies by exploration vs exploitation"""
         a = np.zeros(game.n).astype(int)
-        pr_explore = np.exp(- t * game.beta)
+        pr_explore = np.exp(- t * self.beta)
         # pr_explore = 0.1
         e = (pr_explore > np.random.rand(game.n))
         for n in range(1):

@@ -41,7 +41,6 @@ class IRP(object):
         # Default properties
         self.n = kwargs.get('n', 2)
         self.alpha = kwargs.get('alpha', 0.15)
-        self.beta = kwargs.get('beta', 4e-6)
         self.c = kwargs.get('c', 1)
         self.a = kwargs.get('a', 2)
         self.a0 = kwargs.get('a0', 0)
