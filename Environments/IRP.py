@@ -18,10 +18,6 @@ class IRP(object):
         number of players
     alpha : float
         product differentiation parameter
-    beta : float
-        exploration parameter
-    delta : float
-        discount factor
     mu : float
         product differentiation parameter
     a : int
@@ -32,12 +28,35 @@ class IRP(object):
         marginal cost
     k : int
         dimension of the grid
-    stable: int
+    tstable: int
         periods of game stability
+    tmax: int
+        maximum iterations of play
+    dem_function : str or callable
+        Demand function to use ('default' or custom function).
+    sdim : tuple
+        Dimensions of the state space.
+    s0 : ndarray
+        Initial state.
+    p_minmax : tuple
+        Competitive and monopoly prices.
+    A : ndarray
+        Discrete action space (possible prices).
+    PI : ndarray
+        Profit matrix for all possible states and actions.
     """
 
     def __init__(self, dem_function = 'default',**kwargs):
-        """Initialize game with default values"""
+        """
+        Initialize the IRP model with given or default parameters.
+
+        Parameters:
+        ----------
+        dem_function : str or callable, optional
+            Demand function to use (default is 'default').
+        **kwargs : dict
+            Additional parameters to override default values.
+        """
         # Default properties
         self.n = kwargs.get('n', 2)
         self.alpha = kwargs.get('alpha', 0.15)
@@ -60,13 +79,37 @@ class IRP(object):
         
 
     def demand(self, p):
-        """Computes demand"""
+        """
+        Compute the demand for each firm given their prices.
+
+        Parameters:
+        ----------
+        p : ndarray
+            Array of prices set by each firm.
+
+        Returns:
+        -------
+        ndarray
+            Array of demand quantities for each firm.
+        """
         e = np.exp((self.a - p) / self.mu)
         d = e / (np.sum(e) + np.exp(self.a0 / self.mu))
         return d
 
     def foc(self, p):
-        """Compute first order condition"""
+        """
+        Compute the first-order condition for profit maximization.
+
+        Parameters:
+        ----------
+        p : ndarray
+            Array of prices set by each firm.
+
+        Returns:
+        -------
+        ndarray
+            Array of first-order condition values.
+        """
         if self.dem_function == 'default':
             d = self.demand(p)
         else:
@@ -75,7 +118,19 @@ class IRP(object):
         return np.squeeze(zero)
 
     def foc_monopoly(self, p):
-        """Compute first order condition of a monopolist"""
+        """
+        Compute the first-order condition for a monopolist.
+
+        Parameters:
+        ----------
+        p : ndarray
+            Array of prices set by the monopolist for each product.
+
+        Returns:
+        -------
+        ndarray
+            Array of first-order condition values for a monopolist.
+        """
         if self.dem_function == 'default':
             d = self.demand(p)
         else:
@@ -86,33 +141,73 @@ class IRP(object):
         return np.squeeze(zero)
 
     def compute_p_competitive_monopoly(self):
-        """Computes competitive and monopoly prices"""
+        """
+        Compute competitive and monopoly prices.
+
+        Returns:
+        -------
+        tuple
+            A tuple containing competitive and monopoly prices.
+        """
         p0 = np.ones((1, self.n)) * 3 * self.c
         p_competitive = fsolve(self.foc, p0)
         p_monopoly = fsolve(self.foc_monopoly, p0)
         return p_competitive, p_monopoly
 
     def init_actions(self):
-        """Get action space of the firms"""
+        """
+        Initialize the discrete action space (possible prices).
+
+        Returns:
+        -------
+        ndarray
+            Array of possible prices.
+        """
         a = np.linspace(min(self.p_minmax[0]), max(self.p_minmax[1]), self.k - 2)
         delta = a[1] - a[0]
         A = np.linspace(min(a) - delta, max(a) + delta, self.k)
         return A
 
     def init_state(self):
-        """Get state dimension and initial state"""
+        """
+        Initialize the state space dimensions and initial state.
+
+        Returns:
+        -------
+        tuple
+            A tuple containing state space dimensions and initial state.
+        """
         sdim = (self.k, self.k)
         s0 = np.zeros(len(sdim)).astype(int)
         return sdim, s0
 
     def compute_profits(self, p):
-        """Compute payoffs"""
+        """
+        Compute profits for each firm given their prices.
+
+        Parameters:
+        ----------
+        p : ndarray
+            Array of prices set by each firm.
+
+        Returns:
+        -------
+        ndarray
+            Array of profits for each firm.
+        """ 
         d = self.demand(p)
         pi = (p - self.c) * d
         return pi
 
     def init_PI(game):
-        """Initialize Profits (k^n x kp x n)"""
+        """
+        Initialize the profit matrix for all possible states and actions.
+
+        Returns:
+        -------
+        ndarray
+            3D array of profits for all possible states and actions.
+        """
         PI = np.zeros(game.sdim + (game.n,))
         for s in product(*[range(i) for i in game.sdim]):
             p = np.asarray(game.A[np.asarray(s)])
@@ -120,12 +215,31 @@ class IRP(object):
         return PI
     
     def show_stats(self):
+        """
+        Display competitive and monopoly prices.
+        """
         p_competitive, p_monopoly = self.compute_p_competitive_monopoly()
         print(f"Competitive Price: {p_competitive}")
         print(f"Monopoly Price: {p_monopoly}")
     
     def check_convergence(self, game, t, stable1, stable2):
-        """Check if game converged"""
+        """
+        Check if the game has converged.
+
+        Parameters:
+        ----------
+        t : int
+            Current iteration number.
+        stable1 : int
+            Number of stable periods for algorithm 1.
+        stable2 : int
+            Number of stable periods for algorithm 2.
+
+        Returns:
+        -------
+        bool
+            True if the game has converged, False otherwise.
+        """
         if (t % game.tstable == 0) & (t > 0):
             sys.stdout.write("\rt=%i " % t)
             sys.stdout.flush()
@@ -146,6 +260,21 @@ class IRP(object):
     
     def simulate_game(self, Agent1, Agent2, game):
 
+        """
+        Simulate the game between two agents.
+
+        Parameters:
+        ----------
+        Agent1 : object
+            First agent with pick_strategies and update_function methods.
+        Agent2 : object
+            Second agent with pick_strategies and update_function methods.
+
+        Returns:
+        -------
+        tuple
+            A tuple containing the final state, all visited states, and all actions taken.
+        """
         s = game.s0
         stable1 = 0
         stable2 = 0
@@ -174,14 +303,6 @@ class IRP(object):
             s = s1
             all_visited_states.append(s1)
             if game.check_convergence(game, t, stable1, stable2):
-                # print(f"Q-values difference: {np.max(np.abs(Agent1.Q[0] - Agent2.Q[0]))}")
-                # print(f"Has been in state {s} for the last {[stable_state0, stable_state1]} iterations.")
-                # print(f"Competitive Price: {p_competitive}")
-                # print(f"Monopoly Price: {p_monopoly}")
-                # print(all_visited_states[-5:])
-
-                # print(Agent1.Q[0])
-                # print(Agent2.Q[0])
                 break
         return game, s, all_visited_states, all_actions
 
