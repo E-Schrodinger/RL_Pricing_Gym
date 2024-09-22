@@ -9,7 +9,7 @@
 
 ### Updates (22/09/2024)
  - Tried to fix Batch SARSA, realized it was completely broken.
- - Added new price Deivation Metric. Will force a deviation in actions and create graph of behavior.
+ - Added new Price_Deivation Metric. Will force a deviation in actions and create graph of behavior.
 
 ### Updates (20/09/2024)
 - Added docstrings to the code.
