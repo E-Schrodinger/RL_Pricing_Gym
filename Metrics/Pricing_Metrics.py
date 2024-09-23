@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from collections import Counter
 import pandas as pd
+import networkx as nx
 
 class Pricing_Metric:
     """
@@ -20,6 +21,7 @@ class Pricing_Metric:
         """
         self.iterations = kwargs.get('iterations', 100)
         self.simulation_results = None
+        self.single_results = None
         self.env = game
         self.Agent1 = Agent1
         self.Agent2 = Agent2
@@ -174,13 +176,39 @@ class Pricing_Metric:
         :param index: 0 for Agent1, 1 for Agent2
         :return: DataFrame of Q-values
         """
-        self.run_simulations()
+        if self.simulation_results == None and self.single_results == None:
+            self.single_results = []
+            self.Q_vals_1 = []
+            self.Q_vals_2 = []
+
+            self.agent1_is_q = self.has_q_vals(self.Agent1)
+            self.agent2_is_q = self.has_q_vals(self.Agent2)
+
+            # Run simulations for the specified number of iterations
+            for _ in range(1):
+                self.Agent1.reset(self.env)
+                self.Agent2.reset(self.env)
+                self.env, s, all_visited_states, all_actions = self.env.simulate_game(self.Agent1, self.Agent2, self.env)
+                self.simulation_results.append((all_visited_states, all_actions))
+
+                # Store Q-values if agents use Q-learning or SARSA
+                if self.agent1_is_q:
+                    self.Q_vals_1.append(self.Agent1.Q[0].copy())
+                else:
+                    self.Q_vals_1.append(None)
+
+                if self.agent2_is_q:
+                    self.Q_vals_2.append(self.Agent2.Q[0].copy())
+                else:
+                    self.Q_vals_2.append(None)
+
+        else:
+            self.run_simulations()
 
         if index == 0:
-            Qvals = self.Q_vals_1
+            Qvals = self.Q_vals_1[-1]
         elif index == 1:
-            Qvals = self.Q_vals_2
-        mean_Q = np.mean(Qvals, axis = 0)
+            Qvals = self.Q_vals_2[-1]
 
         sdim, _ = self.env.init_state()
 
@@ -204,14 +232,14 @@ class Pricing_Metric:
             column_names.reverse()
 
         # Add Q-values for each action
-        for k in range(mean_Q.shape[2]):
+        for k in range(Qvals.shape[2]):
             column_names.append(f"{k}")
 
             action_list = []
 
             for i in range(sdim[0]):
                 for j in range(sdim[0]):
-                    action_list.append(mean_Q[(i,j)][k])
+                    action_list.append(Qvals[(i,j)][k])
             
             array_list.append(action_list)
         
@@ -251,3 +279,96 @@ class Pricing_Metric:
         pi_hat = (avg_price1+avg_price2)/self.env.n
 
         return (pi_hat - p_competitive)/(p_monopoly-p_competitive)
+    
+    def create_directed_network_graph(self, adj_matrix, node_labels):
+        if len(node_labels) != len(adj_matrix):
+            raise ValueError("The number of labels must match the number of nodes in the matrix.")
+
+        # Create a directed graph from the adjacency matrix
+        G = nx.DiGraph(adj_matrix)
+
+        # Relabel nodes with the provided labels
+        mapping = {i: node_labels[i] for i in range(len(node_labels))}
+        G = nx.relabel_nodes(G, mapping)
+
+        # Set up the plot
+        plt.figure(figsize=(12, 10))
+
+        # Draw the graph
+        pos = nx.spring_layout(G, k=0.5, iterations=50)  # Adjust layout parameters for better spacing
+        nx.draw(G, pos, with_labels=True, node_color='lightblue', 
+                node_size=4000, font_size=10, font_weight='bold',
+                arrows=True, arrowsize=20, edge_color='gray')
+
+        # # Add edge labels
+        # edge_labels = nx.get_edge_attributes(G, 'weight')
+        # nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels)
+
+        # Show the plot
+        plt.title("Directed Network Graph from Adjacency Matrix")
+        plt.axis('off')
+        plt.tight_layout()
+        plt.show()
+
+    def make_adjency(self):
+        if self.simulation_results == None and self.single_results == None:
+            self.single_results = []
+            self.Q_vals_1 = []
+            self.Q_vals_2 = []
+
+            self.agent1_is_q = self.has_q_vals(self.Agent1)
+            self.agent2_is_q = self.has_q_vals(self.Agent2)
+
+            # Run simulations for the specified number of iterations
+            for _ in range(1):
+                self.Agent1.reset(self.env)
+                self.Agent2.reset(self.env)
+                self.env, s, all_visited_states, all_actions = self.env.simulate_game(self.Agent1, self.Agent2, self.env)
+                self.single_results.append((all_visited_states, all_actions))
+
+                # Store Q-values if agents use Q-learning or SARSA
+                if self.agent1_is_q:
+                    self.Q_vals_1.append(self.Agent1.Q[0].copy())
+                else:
+                    self.Q_vals_1.append(None)
+
+                if self.agent2_is_q:
+                    self.Q_vals_2.append(self.Agent2.Q[0].copy())
+                else:
+                    self.Q_vals_2.append(None)
+
+        else:
+            self.run_simulations()
+
+    
+        Qvals1 = self.Q_vals_1[-1]
+    
+        Qvals2 = self.Q_vals_2[-1]
+
+
+        adj_matrix = np.zeros((self.env.k*self.env.k, self.env.k*self.env.k))
+
+        node_names = []
+
+        for i in range(self.env.k):
+            for j in range(self.env.k):
+                node_names.append(f"({i},{j})")
+
+        for i in range(self.env.k):
+            for j in range(self.env.k):
+            #     print(Qvals1[tuple((i,j))])
+            #     print(Qvals2[tuple((i,j))])
+                x = (i*(self.env.k) + j)
+                y = (np.argmax(Qvals1[tuple((i,j))])*(self.env.k) + np.argmax(Qvals2[tuple((i,j))]))
+                # print(f"x = {x}, y = {y}")
+                adj_matrix[x,y] = 1
+        
+        self.create_directed_network_graph(adj_matrix, node_names)
+
+        
+
+
+
+
+
+

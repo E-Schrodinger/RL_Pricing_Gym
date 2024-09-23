@@ -1,6 +1,6 @@
 from Environments.IRP import IRP
 from Agents.qlearning import Q_Learning
-from Agents.dec_qlearning import Batch_SARSA
+from Agents.dec_qlearning import Dec_Q
 from Metrics.Pricing_Metrics import Pricing_Metric
 from Metrics.Pricing_Deviations import Pricing_Deviation
 
@@ -12,19 +12,24 @@ game = IRP(tmax = 2000000, tstable = 1000, k = 8)
 print(f'Max val = {game.tmax}')
 print(game.init_actions())
 
-Agent1 = Q_Learning(game, beta = 0.00001, Qinit = 'uniform')
-Agent2 = Q_Learning(game, beta = 0.00001, Qinit = 'uniform')
+Agent1 = Q_Learning(game, beta = 0.0001, Qinit = 'calvano')
+Agent2 = Q_Learning(game, beta = 0.0001, Qinit = 'calvano')
 
+Agent1_Q = Dec_Q(game, beta = 1, Qinit = 'calvano', batch_size = 100)
+Agent2_Q = Dec_Q(game, beta = 1, Qinit = 'calvano', batch_size = 100)
 
 PM = Pricing_Metric(game, Agent1, Agent2, iterations = 5)
 
 ### Gives the Average Price
-PM.average_price()
+#PM.average_price()
 
-print(PM.Q_table(0))
+PM.make_adjency()
+
+#print(PM.Q_table(0))
 
 ### Makes Heatmap
-PM.state_heatmap()
+#PM.state_heatmap()
+
 
 ### Outputs Q-table, 0 = Agent1, 1 = Agent2
 #print(PM.Q_table(0))

@@ -2,7 +2,6 @@
 
 ### TODO
  - Check on Q-learning convergence rate
- - Implement Decentralized Q-learning
  - Add state space to Agent class
  - Add time dependent metrics
  - Add the network graph from Calvano
@@ -10,6 +9,12 @@
  - Fix batch SARSA, completely broken
  - Add Regret from Professor Arnoud's paper.
  - Do more testing on convergence of Batch_SARSA
+
+### Updates (23/09/2024)
+ - Bug fixes.
+ - Added different initializations for Q-learning. (uniform, calvano, zero)
+ - Implemented Decentralized Q-learning
+ - Added Network Graph which displays Reward-punishment schemes for states. (Works fine but not visually readable.)
 
 ### Updates (22/09/2024)
  - Tried to fix Batch SARSA, realized it was completely broken.
