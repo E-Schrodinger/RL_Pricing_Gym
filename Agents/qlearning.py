@@ -42,6 +42,7 @@ class Q_Learning:
         self.delta = kwargs.get('delta', 0.95)
         self.epsilon = kwargs.get('epsilon', 0.1)
         self.beta = kwargs.get('beta', 4e-6)
+        self.Qinit = kwargs.get('Qinit', 'uniform')
 
         self.Q = self.init_Q(game)
 
@@ -62,13 +63,19 @@ class Q_Learning:
         ndarray
             Initialized Q-function.
         """
-        Q = np.zeros((game.n,) + game.sdim + (game.k,))
-        for n in range(game.n):
-            # Calculate mean payoffs across opponent's actions
-            pi = np.mean(game.PI[:, :, n], axis=1 - n)
-            # Initialize Q-values with discounted mean payoffs
-            Q[n] = np.tile(pi, game.sdim + (1,)) / (1 - self.delta)
+        if self.Qinit == 'uniform':
+            Q = np.random.rand(game.n, *game.sdim, game.k)
+        elif self.Qinit == 'zero':
+            Q = np.zeros((game.n,) + game.sdim + (game.k,))
+        else:
+            Q = np.zeros((game.n,) + game.sdim + (game.k,))
+            for n in range(game.n):
+                # Calculate mean payoffs across opponent's actions
+                pi = np.mean(game.PI[:, :, n], axis=1 - n)
+                # Initialize Q-values with discounted mean payoffs
+                Q[n] = np.tile(pi, game.sdim + (1,)) / (1 - self.delta)
         return Q
+    
     
     def reset(self, game):
         """

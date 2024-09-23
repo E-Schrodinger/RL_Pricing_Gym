@@ -174,6 +174,8 @@ class Pricing_Metric:
         :param index: 0 for Agent1, 1 for Agent2
         :return: DataFrame of Q-values
         """
+        self.run_simulations()
+
         if index == 0:
             Qvals = self.Q_vals_1
         elif index == 1:

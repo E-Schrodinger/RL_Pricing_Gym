@@ -1,7 +1,11 @@
 ## RL gym
 
 ### TODO
-
+ - Check on Q-learning convergence rate
+ - Implement Decentralized Q-learning
+ - Add state space to Agent class
+ - Add time dependent metrics
+ - Add the network graph from Calvano
  - Add a softmax policy for choosing Actions
  - Fix batch SARSA, completely broken
  - Add Regret from Professor Arnoud's paper.

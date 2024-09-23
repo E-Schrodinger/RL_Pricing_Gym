@@ -20,9 +20,6 @@ class Pricing_Deviation:
         self.Agent2 = Agent2
 
     def run_simulations(self):
-        """
-        Run multiple simulations of the game and store the results.
-        """
         self.simulation_results = []
         self.Q_vals_1 = []
         self.Q_vals_2 = []
@@ -76,6 +73,7 @@ class Pricing_Deviation:
         plt.figure(figsize=(10, 6))
         plt.plot(range(len(a1_values)), a1_values, label='Agent 1')
         plt.plot(range(len(a2_values)), a2_values, label='Agent 2')
+        plt.ylim((0,game.k-1))
         plt.xlabel('Time')
         plt.ylabel('Action Value')
         plt.title('Agent Actions Over Time')
