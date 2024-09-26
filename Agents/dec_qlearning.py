@@ -61,11 +61,6 @@ class Dec_Q:
         self.Q_val = self.Q.copy()
         self.num = self.init_num(game)
 
-        # Initialize action selection probabilities
-        self.X = np.full(self.Q.shape, self.epsilon / game.k)
-        for n in range(1):
-            optimal_actions = np.argmax(self.Q[n], axis=-1)
-            self.X[n][np.arange(game.sdim[0]), np.arange(game.sdim[1]), optimal_actions] += 1 - self.epsilon
 
     def init_Q_act(self, game):
         """
@@ -85,21 +80,22 @@ class Dec_Q:
             Initialized Q-function.
         """
         if self.Qinit == 'uniform':
-            Q = np.random.rand(game.n, *game.sdim, game.k)
+            Q = np.random.rand( game.sdim +  (game.k,))
         elif self.Qinit == 'zero':
-            Q = np.zeros((game.n,) + game.sdim + (game.k,))
+            Q = np.zeros( game.sdim + (game.k,))
         else:
-            Q = np.zeros((game.n,) + game.sdim + (game.k,))
-            for n in range(game.n):
-                # Calculate mean payoffs across opponent's actions
-                pi = np.mean(game.PI[:, :, n], axis=1 - n)
-                # Initialize Q-values with discounted mean payoffs
-                Q[n] = np.tile(pi, game.sdim + (1,)) / (1 - self.delta)
+            Q = np.zeros( game.sdim + (game.k,))
+       
+            # Calculate mean payoffs across opponent's actions
+            pi = np.mean(game.PI[:, :,0], axis=0)
+            # Initialize Q-values with discounted mean payoffs
+            Q = np.tile(pi, game.sdim + (1,)) / (1 - self.delta)
+  
         return Q
     
     def init_num(self, game):
         """Initialize visit counter (n x #s x k)"""
-        return np.zeros((game.n,) + game.sdim + (game.k,))
+        return np.zeros( game.sdim + (game.k,))
     
     def reset(self, game):
         """Reset all data structures to initial state"""
@@ -110,6 +106,8 @@ class Dec_Q:
     def pick_strategies(self, game, s, t):
         """
         Choose actions based on the current Q-function and exploration strategy.
+
+        This method implements an epsilon-greedy strategy with decaying exploration rate.
 
         Parameters:
         ----------
@@ -125,14 +123,20 @@ class Dec_Q:
         ndarray
             Chosen actions for each player.
         """
-        a = np.zeros(game.n).astype(int)
+        a = np.zeros(1)
+        # Calculate exploration probability with exponential decay
         pr_explore = np.exp(- t * self.beta)
-        e = (pr_explore > np.random.rand(game.n))
-        for n in range(1):
-            if e[n]:
-                a[n] = np.random.randint(0, game.k)
-            else:
-                a[n] = np.argmax(self.Q[(n,) + tuple(s)])
+        # pr_explore = 0.1  # Alternatively, use a fixed exploration rate
+        
+        # Determine whether to explore or exploit for each player
+        e = (pr_explore > np.random.rand())
+        
+        if e:
+            # Explore: choose a random action
+            a = np.random.randint(0, game.k)
+        else:
+            # Exploit: choose the action with the highest Q-value
+            a = np.argmax(self.Q[ tuple(s)])
         return a
     
     def X_function(self, game, s, a):
@@ -153,13 +157,13 @@ class Dec_Q:
         ndarray
             Probabilities of selecting action a for each player.
         """
-        probabilities = np.zeros(game.n)
-        for n in range(game.n):
-            optimal = np.argmax(self.Q_val[(n,) + tuple(s)])
-            if a == optimal:
-                probabilities[n] = self.epsilon/game.k + 1 - self.epsilon
-            else:
-                probabilities[n] = self.epsilon/game.k
+        
+    
+        optimal = np.argmax(self.Q_val[tuple(s)])
+        if a == optimal:
+            probabilities = self.epsilon/game.k + 1 - self.epsilon
+        else:
+            probabilities = self.epsilon/game.k
         return probabilities
     
     def adaption_phase(self, game, s_hat, a_hat):
@@ -177,10 +181,9 @@ class Dec_Q:
         s_prime : tuple
             Next state.
         """
-        for n in range(1):
-            state = (n,) + tuple(s_hat) + (a_hat[n],)
-            self.Q[state] = self.Q_val[state]
-    
+        state = tuple(s_hat) + (a_hat,)
+        self.Q[state] = self.Q_val[state]
+
     def update_function(self, game, s, a, s1, pi, stable, t, tol = 1e-1):
         """
         Update the Q-function based on the observed transition and reward.
@@ -209,25 +212,25 @@ class Dec_Q:
         tuple
             Updated Q-function and stability counter.
         """
-        for n in range(1):
-            subj_state = (n,) + tuple(s) + (a[n],)
-            old_value = self.Q_val[subj_state]
+       
+        subj_state = tuple(s) + (a,)
+        old_value = self.Q_val[subj_state]
+        
+        # Update counters and accumulated rewards
+        self.num[subj_state] += 1
+
+        # Calculate learning rate
+        a_t = 1/(self.num[subj_state]+1)
+        
+        # Calculate expected Q-value of next state
+        Q_merge = 0
+        for i in range(game.k):
+            Q_merge += self.X_function(game, s1, i) * self.Q_val[ tuple(s1) + (i,)]
+
+        # Update Q-value
+        self.Q_val[subj_state] = (1-a_t)*old_value + a_t*(pi + self.delta*Q_merge)
+
             
-            # Update counters and accumulated rewards
-            self.num[subj_state] += 1
-
-            # Calculate learning rate
-            a_t = 1/(self.num[subj_state]+1)
-            
-            # Calculate expected Q-value of next state
-            Q_merge = 0
-            for i in range(game.k):
-                Q_merge += self.X_function(game, s1, i) * self.Q_val[(n,) + tuple(s1) + (i,)]
-
-            # Update Q-value
-            self.Q_val[subj_state] = (1-a_t)*old_value + a_t*(pi[n] + self.delta*Q_merge[n])
-
-            # Check stability
 
         # Perform batch update if necessary
         if (t % self.batch_size == 0):

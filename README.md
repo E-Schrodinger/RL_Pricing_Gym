@@ -2,13 +2,17 @@
 
 ### TODO
  - Check on Q-learning convergence rate
+ - Fix my graphics
  - Add state space to Agent class
  - Add time dependent metrics
- - Add the network graph from Calvano
  - Add a softmax policy for choosing Actions
  - Fix batch SARSA, completely broken
  - Add Regret from Professor Arnoud's paper.
  - Do more testing on convergence of Batch_SARSA
+
+### Updates (26/09/2024)
+ - Rewrote some of the code to remove redundancies.
+ - Added Regret metric.
 
 ### Updates (23/09/2024)
  - Bug fixes.

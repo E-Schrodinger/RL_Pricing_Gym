@@ -50,12 +50,15 @@ class Pricing_Deviation:
         for t in range(int(tmax)):
            # print(f"t = {t} ----------------------------------------------------------------------------------------")
             
+            tbig = 1000000
+
             if t<= tdeviate:
-                a1 = deviation
-                a2 = self.Agent2.pick_strategies(game, s[::-1], t)[0]
+                a1 = deviation  
             else:
-                a1 = self.Agent1.pick_strategies(game, s, t)[0]
-                a2 = self.Agent2.pick_strategies(game, s[::-1], t)[0]
+                a1 = self.Agent1.pick_strategies(game, s, tbig)[0]
+
+            a2 = self.Agent2.pick_strategies(game, s[::-1], tbig)[0]
+
             a = (a1, a2)
             all_actions.append(a)
             a1_values.append(a1)

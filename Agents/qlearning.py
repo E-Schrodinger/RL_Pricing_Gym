@@ -64,16 +64,17 @@ class Q_Learning:
             Initialized Q-function.
         """
         if self.Qinit == 'uniform':
-            Q = np.random.rand(game.n, *game.sdim, game.k)
+            Q = np.random.rand( game.sdim +  (game.k,))
         elif self.Qinit == 'zero':
-            Q = np.zeros((game.n,) + game.sdim + (game.k,))
+            Q = np.zeros( game.sdim + (game.k,))
         else:
-            Q = np.zeros((game.n,) + game.sdim + (game.k,))
-            for n in range(game.n):
-                # Calculate mean payoffs across opponent's actions
-                pi = np.mean(game.PI[:, :, n], axis=1 - n)
-                # Initialize Q-values with discounted mean payoffs
-                Q[n] = np.tile(pi, game.sdim + (1,)) / (1 - self.delta)
+            Q = np.zeros( game.sdim + (game.k,))
+       
+            # Calculate mean payoffs across opponent's actions
+            pi = np.mean(game.PI[:, :,0], axis=0)
+            # Initialize Q-values with discounted mean payoffs
+            Q = np.tile(pi, game.sdim + (1,)) / (1 - self.delta)
+  
         return Q
     
     
@@ -108,21 +109,20 @@ class Q_Learning:
         ndarray
             Chosen actions for each player.
         """
-        a = np.zeros(game.n).astype(int)
+        a = np.zeros(1)
         # Calculate exploration probability with exponential decay
         pr_explore = np.exp(- t * self.beta)
         # pr_explore = 0.1  # Alternatively, use a fixed exploration rate
         
         # Determine whether to explore or exploit for each player
-        e = (pr_explore > np.random.rand(game.n))
+        e = (pr_explore > np.random.rand())
         
-        for n in range(1):  # Note: This loop only runs once. Consider removing the loop if n is always 0.
-            if e[n]:
-                # Explore: choose a random action
-                a[n] = np.random.randint(0, game.k)
-            else:
-                # Exploit: choose the action with the highest Q-value
-                a[n] = np.argmax(self.Q[(n,) + tuple(s)])
+        if e:
+            # Explore: choose a random action
+            a = np.random.randint(0, game.k)
+        else:
+            # Exploit: choose the action with the highest Q-value
+            a = np.argmax(self.Q[ tuple(s)])
         return a
     
     def update_function(self, game, s, a, s1, pi, stable, t, tol=1e-3):
@@ -155,25 +155,27 @@ class Q_Learning:
         tuple
             Updated Q-function and stability counter.
         """
-        for n in range(1):  # Note: This loop only runs once. Consider removing the loop if n is always 0.
-            # Construct the index for the current state-action pair
-            subj_state = (n,) + tuple(s) + (a[n],)
-            
-            # Store old Q-values for stability check
-            old_q = self.Q[0].copy()
-            old_value = self.Q[subj_state]
-            
-            # Compute the maximum Q-value for the next state
-            max_q1 = np.max(self.Q[(n,) + tuple(s1)])
-            
-            # Compute the new Q-value using the Q-learning update rule
-            new_value = pi[n] + self.delta * max_q1
-            
-            # Update the Q-value using a weighted average of old and new values
-            self.Q[subj_state] = (1 - game.alpha) * old_value + game.alpha * new_value
-            
-            # Check for stability (convergence)
-            same_q = np.allclose(old_q, self.Q[0], tol)
-            stable = (stable + same_q) * same_q  # Reset to 0 if not stable, increment if stable
+       
+        # Construct the index for the current state-action pair
+        subj_state = tuple(s) + (a[0],)
+        # print(self.Q)
+        # print(f"Q-table shape: {self.Q.shape}")
+        # print(f"subj_state: {subj_state}")
+        # Store old Q-values for stability check
+        old_q = self.Q.copy()
+        old_value = self.Q[subj_state]
+        # Compute the maximum Q-value for the next state
+        max_q1 = np.max(self.Q[tuple(s1)])
         
+        # Compute the new Q-value using the Q-learning update rule
+        new_value = pi + self.delta * max_q1
+
+        
+        # Update the Q-value using a weighted average of old and new values
+        self.Q[subj_state] = (1 - game.alpha) * old_value + game.alpha * new_value
+        
+        # Check for stability (convergence)
+        same_q = np.allclose(old_q, self.Q, tol)
+        stable = (stable + same_q) * same_q  # Reset to 0 if not stable, increment if stable
+    
         return self.Q, stable

@@ -284,8 +284,8 @@ class IRP(object):
         all_actions = []
         for t in range(int(game.tmax)):
            # print(f"t = {t} ----------------------------------------------------------------------------------------")
-            a1 = Agent1.pick_strategies(game, s, t)[0]
-            a2 = Agent2.pick_strategies(game, s[::-1], t)[0]
+            a1 = Agent1.pick_strategies(game, s, t)
+            a2 = Agent2.pick_strategies(game, s[::-1], t)
             a = (a1, a2)
             all_actions.append(a)
             # print(a)
@@ -298,8 +298,8 @@ class IRP(object):
             same_state1 = (s[1] == s1[1])
             stable_state1 = (stable_state1 + same_state1)*same_state1
 
-            _, stable1 = Agent1.update_function(game, s, a, s1, pi1, stable1, t)
-            _, stable2 = Agent2.update_function(game, s[::-1], a[::-1], s1[::-1], pi2, stable2, t)
+            _, stable1 = Agent1.update_function(game, s, a, s1, pi1[0], stable1, t)
+            _, stable2 = Agent2.update_function(game, s[::-1], a[::-1], s1[::-1], pi2[0], stable2, t)
             s = s1
             all_visited_states.append(s1)
             if game.check_convergence(game, t, stable1, stable2):

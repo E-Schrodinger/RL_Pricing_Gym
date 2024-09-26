@@ -36,8 +36,8 @@ class Pricing_Metric:
         :param agent: The agent to check
         :return: Boolean indicating if the agent uses Q-values
         """
-        return (type(agent).__name__ in ['Q_Learning', 'Batch_SARSA'] or
-                any(base.__name__ in ['Q_Learning', 'Batch_SARSA'] for base in type(agent).__bases__))
+        return (type(agent).__name__ in ['Q_Learning', 'Batch_SARSA', 'Dec_Q'] or
+                any(base.__name__ in ['Q_Learning', 'Batch_SARSA', 'Dec_Q'] for base in type(agent).__bases__))
 
     def run_simulations(self):
         """
@@ -69,6 +69,20 @@ class Pricing_Metric:
                 else:
                     self.Q_vals_2.append(None)
 
+    def make_action_lists(self):
+        self.run_simulations()
+
+        a1_list = []
+        a2_list = []
+
+        for _, all_actions in self.simulation_results:
+            a1_actions = [action[0] for action in all_actions]
+            a2_actions = [action[1] for action in all_actions]
+            a1_list.append(a1_actions)
+            a2_list.append(a2_actions)
+
+        return a1_list, a2_list
+    
     def average_price(self):
         """
         Calculate the average price set by each agent over all simulations.
@@ -292,22 +306,24 @@ class Pricing_Metric:
         G = nx.relabel_nodes(G, mapping)
 
         # Set up the plot
-        plt.figure(figsize=(12, 10))
+        plt.figure(figsize=(20, 20))
+
+        # Use a circular layout for better organization
+        pos = nx.spring_layout(G, k=0.3, iterations=50) 
 
         # Draw the graph
-        pos = nx.spring_layout(G, k=0.5, iterations=50)  # Adjust layout parameters for better spacing
         nx.draw(G, pos, with_labels=True, node_color='lightblue', 
-                node_size=4000, font_size=10, font_weight='bold',
-                arrows=True, arrowsize=20, edge_color='gray')
+                node_size=3000, font_size=8, font_weight='bold',
+                arrows=True, arrowsize=15, edge_color='gray',
+                connectionstyle="arc3,rad=0.1")  # Curved edges for clarity
 
-        # # Add edge labels
-        # edge_labels = nx.get_edge_attributes(G, 'weight')
-        # nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels)
+        # Add a title
+        plt.title("Directed Network Graph of Agent Actions", fontsize=16)
+
+        # Adjust margins
+        plt.tight_layout()
 
         # Show the plot
-        plt.title("Directed Network Graph from Adjacency Matrix")
-        plt.axis('off')
-        plt.tight_layout()
         plt.show()
 
     def make_adjency(self):
