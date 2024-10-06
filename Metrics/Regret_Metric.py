@@ -62,43 +62,7 @@ class Regret_Metric:
             plt.grid(True)
             plt.show()
 
-    # def find_regret(self, a1_list, a2_list, index = 0):
-    #     if index == 0:
-    #         list1 = a1_list
-    #         list2 = a2_list
-    #     elif index == 1:
-    #         list1 = a2_list
-    #         list2 = a1_list
 
-    #     action_space = len(self.env.init_actions())
-    #     single_strategy = []
-
-    #     for i in range(action_space):
-    #         total_reward = 0
-    #         for j in range(len(list1)):
-    #             temp_pair = [0,0]
-    #             temp_pair[index] = i
-    #             temp_pair[1-index] = list2[j]
-    #             total_reward += self.env.PI[tuple(temp_pair)]
-    #         single_strategy.append(total_reward)
-        
-    #     best_strategy = np.argmax(single_strategy)
-
-    #     regret_over_time = []
-
-    #     for i in range(len(list1)):
-    #         total_reward_i = 0
-    #         best_reward_i = 0
-    #         for j in range(i+1):
-    #             temp_pair = [0,0]
-    #             temp_pair[index] = best_strategy
-    #             temp_pair[1-index] = list2[j]
-    #             best_reward_i += self.env.PI[tuple(temp_pair)]
-    #             total_reward_i += self.env.PI[(list1,list2)]
-    #         regret_over_time.append(1-(total_reward_i/best_reward_i))
-
-
-    #     return regret_over_time
     
    
     

@@ -125,7 +125,7 @@ class Q_Learning:
             a = np.argmax(self.Q[ tuple(s)])
         return a
     
-    def update_function(self, game, s, a, s1, pi, stable, t, tol=1e-3):
+    def update_function(self, game, s, a, s1, pi, stable, t, tol=1e-5):
         """
         Update the Q-function based on the observed transition and reward.
 

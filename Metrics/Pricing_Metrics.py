@@ -60,12 +60,12 @@ class Pricing_Metric:
 
                 # Store Q-values if agents use Q-learning or SARSA
                 if self.agent1_is_q:
-                    self.Q_vals_1.append(self.Agent1.Q[0].copy())
+                    self.Q_vals_1.append(self.Agent1.Q.copy())
                 else:
                     self.Q_vals_1.append(None)
 
                 if self.agent2_is_q:
-                    self.Q_vals_2.append(self.Agent2.Q[0].copy())
+                    self.Q_vals_2.append(self.Agent2.Q.copy())
                 else:
                     self.Q_vals_2.append(None)
 
@@ -203,16 +203,16 @@ class Pricing_Metric:
                 self.Agent1.reset(self.env)
                 self.Agent2.reset(self.env)
                 self.env, s, all_visited_states, all_actions = self.env.simulate_game(self.Agent1, self.Agent2, self.env)
-                self.simulation_results.append((all_visited_states, all_actions))
+                self.single_results.append((all_visited_states, all_actions))
 
                 # Store Q-values if agents use Q-learning or SARSA
                 if self.agent1_is_q:
-                    self.Q_vals_1.append(self.Agent1.Q[0].copy())
+                    self.Q_vals_1.append(self.Agent1.Q.copy())
                 else:
                     self.Q_vals_1.append(None)
 
                 if self.agent2_is_q:
-                    self.Q_vals_2.append(self.Agent2.Q[0].copy())
+                    self.Q_vals_2.append(self.Agent2.Q.copy())
                 else:
                     self.Q_vals_2.append(None)
 
@@ -246,7 +246,7 @@ class Pricing_Metric:
             column_names.reverse()
 
         # Add Q-values for each action
-        for k in range(Qvals.shape[2]):
+        for k in range(len(self.env.init_actions())):
             column_names.append(f"{k}")
 
             action_list = []
@@ -306,14 +306,15 @@ class Pricing_Metric:
         G = nx.relabel_nodes(G, mapping)
 
         # Set up the plot
-        plt.figure(figsize=(20, 20))
+        plt.figure(figsize=(10, 10))
 
         # Use a circular layout for better organization
-        pos = nx.spring_layout(G, k=0.3, iterations=50) 
+        pos = nx.spring_layout(G, k=0.5, iterations=20) 
+        # pos = nx.kamada_kawai_layout(G, scale = 5)
 
         # Draw the graph
         nx.draw(G, pos, with_labels=True, node_color='lightblue', 
-                node_size=3000, font_size=8, font_weight='bold',
+                node_size=2000, font_size=8, font_weight='bold',
                 arrows=True, arrowsize=15, edge_color='gray',
                 connectionstyle="arc3,rad=0.1")  # Curved edges for clarity
 
@@ -344,12 +345,12 @@ class Pricing_Metric:
 
                 # Store Q-values if agents use Q-learning or SARSA
                 if self.agent1_is_q:
-                    self.Q_vals_1.append(self.Agent1.Q[0].copy())
+                    self.Q_vals_1.append(self.Agent1.Q.copy())
                 else:
                     self.Q_vals_1.append(None)
 
                 if self.agent2_is_q:
-                    self.Q_vals_2.append(self.Agent2.Q[0].copy())
+                    self.Q_vals_2.append(self.Agent2.Q.copy())
                 else:
                     self.Q_vals_2.append(None)
 
@@ -380,6 +381,39 @@ class Pricing_Metric:
                 adj_matrix[x,y] = 1
         
         self.create_directed_network_graph(adj_matrix, node_names)
+
+    def profit_graph(self, a1_list, a2_list):
+        profit_list1 = [self.env.init_PI()[(p1,p2)] for p1,p2 in zip(a1_list,a2_list)]
+        # profit_list2 = [self.env.init_PI()[(p2,p1)] for p1,p2 in zip(a1_list,a2_list)]
+        
+        # Extract the first value from each pair for both players
+        player1_profits = profit_list1[0][:, 0]  # First column of the array
+        player2_profits = profit_list1[0][:, 1]  # First column of the array
+        
+        # Create a time list
+        time = np.arange(len(player1_profits))
+        
+        # Create the plot
+        plt.figure(figsize=(10, 6))
+        plt.plot(time, player1_profits, label='Player 1', marker='o')
+        plt.plot(time, player2_profits, label='Player 2', marker='s')
+        plt.ylim((0,2))
+        
+        # Add labels and title
+        plt.xlabel('Time')
+        plt.ylabel('Profit')
+        plt.title('Profit over Time for Both Players')
+        
+        # Add legend
+        plt.legend()
+        
+        # Add grid
+        plt.grid(True, linestyle='--', alpha=0.7)
+        
+        # Show the plot
+        plt.show()
+
+
 
         
 

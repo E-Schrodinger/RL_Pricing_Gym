@@ -1,14 +1,22 @@
 ## RL gym
 
 ### TODO
- - Check on Q-learning convergence rate
- - Fix my graphics
  - Add state space to Agent class
  - Add time dependent metrics
  - Add a softmax policy for choosing Actions
  - Fix batch SARSA, completely broken
- - Add Regret from Professor Arnoud's paper.
- - Do more testing on convergence of Batch_SARSA
+ - Multi armed bandit to plot regret
+ - Weighted edges based on number of visits
+
+
+
+### Updates (29/09/2024)
+ - Added profit evolution graph
+
+### Updates (29/09/2024)
+ - Sanity checks on Q learning and analysis of convergence rates
+ - Tried to fix the visuals of the network graph. Pretty good upto k = 8.
+
 
 ### Updates (26/09/2024)
  - Rewrote some of the code to remove redundancies.
@@ -36,4 +44,3 @@
  - Made Pricing_metrics more simulation efficient (runs only one set of simulations)
  - Fixed Pricing_Metrics to a single environment and Agent pairs per initialization.
  - Added Q_value checks for Agents in Pricing Metrics
- - Removed Herobrine

@@ -9,12 +9,12 @@ import numpy as np
 
 
 # Init algorithm
-game = IRP(tmax = 2000000, tstable = 1000, k = 15)
+game = IRP(tmax = 2000000, tstable = 10000, k = 4)
 print(f'Max val = {game.tmax}')
 print(game.init_actions())
 
-Agent1 = Q_Learning(game, beta = 1, Qinit = 'calvano')
-Agent2 = Q_Learning(game, beta = 1, Qinit = 'calvano')
+Agent1 = Q_Learning(game, beta = 0.1, Qinit = 'calvano')
+Agent2 = Q_Learning(game, beta = 0.1, Qinit = 'calvano')
 
 Agent1_Q = Dec_Q(game, beta = 1, Qinit = 'calvano', batch_size = 100)
 Agent2_Q = Dec_Q(game, beta = 1, Qinit = 'calvano', batch_size = 100)
@@ -24,9 +24,13 @@ PM = Pricing_Metric(game, Agent1, Agent2, iterations = 1)
 ### Gives the Average Price
 # PM.average_price()
 
-PM.make_adjency()
+a1_list, a2_list = PM.make_action_lists()
+PM.profit_graph(a1_list, a2_list)
 
 #print(PM.Q_table(0))
+# PM.make_adjency()
+
+
 
 ### Makes Heatmap
 # PM.state_heatmap()
@@ -42,7 +46,7 @@ PM.make_adjency()
 #game.show_stats()
 
 
-PD = Pricing_Deviation(game, Agent1, Agent2)
+# PD = Pricing_Deviation(game, Agent1, Agent2)
 
 ### Forces a deviation of agent 1, then outputs a graph which shows the behavior of the agents
 ### tdeviate = number of iterations for which Agent 1 has a fixed action
@@ -51,10 +55,10 @@ PD = Pricing_Deviation(game, Agent1, Agent2)
 
 #PD.simulate_deviation(game, tdeviate = 50, tmax = 100, deviated_price = 13)
 
-a1_list, a2_list = PM.make_action_lists()
 
-#RM = Regret_Metric(game, Agent1, Agent2)
-#RM.plot_regret(RM.find_regret(a1_list[0], a2_list[0]))
+
+# RM = Regret_Metric(game, Agent1, Agent2)
+# RM.plot_regret(RM.find_regret(a1_list[0], a2_list[0]))
 
 
 
