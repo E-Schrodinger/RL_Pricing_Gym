@@ -7,9 +7,10 @@ This module implements Q-learning algorithms for reinforcement learning in game 
 import sys
 import numpy as np
 import copy
+from Agents.QBase import QBase
 
 
-class Q_Learning:
+class Q_Learning(QBase):
     """
     A class implementing Q-learning for reinforcement learning in games.
 
@@ -39,43 +40,13 @@ class Q_Learning:
         **kwargs : dict
             Additional parameters to override default values.
         """
-        self.delta = kwargs.get('delta', 0.95)
+        
         self.epsilon = kwargs.get('epsilon', 0.1)
         self.beta = kwargs.get('beta', 4e-6)
-        self.Qinit = kwargs.get('Qinit', 'uniform')
 
-        self.Q = self.init_Q(game)
+        super().__init__(game, **kwargs)
 
-    def init_Q(self, game):
-        """
-        Initialize the Q-function.
 
-        This method creates and initializes the Q-function based on the game's
-        dimensions and initial payoffs.
-
-        Parameters:
-        ----------
-        game : object
-            The game environment.
-
-        Returns:
-        -------
-        ndarray
-            Initialized Q-function.
-        """
-        if self.Qinit == 'uniform':
-            Q = np.random.rand( game.sdim +  (game.k,))
-        elif self.Qinit == 'zero':
-            Q = np.zeros( game.sdim + (game.k,))
-        else:
-            Q = np.zeros( game.sdim + (game.k,))
-       
-            # Calculate mean payoffs across opponent's actions
-            pi = np.mean(game.PI[:, :,0], axis=0)
-            # Initialize Q-values with discounted mean payoffs
-            Q = np.tile(pi, game.sdim + (1,)) / (1 - self.delta)
-  
-        return Q
     
     
     def reset(self, game):
@@ -87,9 +58,10 @@ class Q_Learning:
         game : object
             The game environment.
         """
-        self.Q = self.init_Q(game)
+        self.Q = self.make_Q()
+        self.price_state_space = copy.copy(self.a1_space)
     
-    def pick_strategies(self, game, s, t):
+    def pick_strategies(self, game, p, t):
         """
         Choose actions based on the current Q-function and exploration strategy.
 
@@ -109,6 +81,7 @@ class Q_Learning:
         ndarray
             Chosen actions for each player.
         """
+        s = (self.get_index_1(p[0]), self.get_index_2(p[1]))
         a = np.zeros(1)
         # Calculate exploration probability with exponential decay
         pr_explore = np.exp(- t * self.beta)
@@ -119,13 +92,15 @@ class Q_Learning:
         
         if e:
             # Explore: choose a random action
-            a = np.random.randint(0, game.k)
+            a = np.random.randint(0, self.k)
         else:
             # Exploit: choose the action with the highest Q-value
-            a = np.argmax(self.Q[ tuple(s)])
-        return a
+            a = np.argmax(self.Q[tuple(s)])
     
-    def update_function(self, game, s, a, s1, pi, stable, t, tol=1e-5):
+        a_price = self.a1_space[a]
+        return a_price
+    
+    def update_function(self, game, p, a_prices, pi, stable, t, tol=1e-5):
         """
         Update the Q-function based on the observed transition and reward.
 
@@ -155,17 +130,19 @@ class Q_Learning:
         tuple
             Updated Q-function and stability counter.
         """
-       
+        self.dt = t
+        s = (self.get_index_1(p[0]), self.get_index_2(p[1]))
+        a = (self.get_index_1(a_prices[0]), self.get_index_2(a_prices[1]))
+
         # Construct the index for the current state-action pair
         subj_state = tuple(s) + (a[0],)
-        # print(self.Q)
-        # print(f"Q-table shape: {self.Q.shape}")
-        # print(f"subj_state: {subj_state}")
         # Store old Q-values for stability check
         old_q = self.Q.copy()
         old_value = self.Q[subj_state]
         # Compute the maximum Q-value for the next state
-        max_q1 = np.max(self.Q[tuple(s1)])
+        
+        max_q1 = np.max(self.Q[tuple(a)])
+       
         
         # Compute the new Q-value using the Q-learning update rule
         new_value = pi + self.delta * max_q1
