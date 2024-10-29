@@ -64,17 +64,16 @@ class IRP(object):
         self.a = kwargs.get('a', 2)
         self.a0 = kwargs.get('a0', 0)
         self.mu = kwargs.get('mu', 0.25)
-        self.k = kwargs.get('k', 15)
         self.tstable = kwargs.get('tstable', 1e2)
         self.tmax = kwargs.get('tmax', 1e4)
 
         self.dem_function = dem_function
 
         # Derived properties
-        self.sdim, self.s0 = self.init_state()
-        self.p_minmax = self.compute_p_competitive_monopoly()
-        self.A = self.init_actions()
-        self.PI = self.init_PI()
+        # self.sdim, self.s0 = self.init_state()
+        # self.p_minmax = self.compute_p_competitive_monopoly()
+        # self.A = self.init_actions()
+        # self.PI = self.init_PI()
 
         
 
@@ -257,7 +256,7 @@ class IRP(object):
             print('ERROR! Not Converged!')
             return True
         return False
-    
+
     def simulate_game(self, Agent1, Agent2, game):
 
         """
@@ -275,7 +274,7 @@ class IRP(object):
         tuple
             A tuple containing the final state, all visited states, and all actions taken.
         """
-        s = game.s0
+        s = (Agent1.s0, Agent2.s0)
         stable1 = 0
         stable2 = 0
         stable_state0 = 0
@@ -283,14 +282,18 @@ class IRP(object):
         all_visited_states = []
         all_actions = []
         for t in range(int(game.tmax)):
-           # print(f"t = {t} ----------------------------------------------------------------------------------------")
+            
+            # print(Agent2.Q[(0,2)])
+            # print(Agent2.Q[(3,2)])
+            # print(f"t = {t} ----------------------------------------------------------------------------------------")
             a1 = Agent1.pick_strategies(game, s, t)
             a2 = Agent2.pick_strategies(game, s[::-1], t)
             a = (a1, a2)
+            a_prof = np.array([a1,a2])
             all_actions.append(a)
             # print(a)
-            pi1 = game.PI[a]
-            pi2 = game.PI[a[::-1]]
+            pi1 = self.compute_profits(a_prof)
+            # pi2 = self.compute_profits(a_prof[::-1])
             s1 = a
             same_state0 = (s[0] == s1[0])
             stable_state0 = (stable_state0 + same_state0)*same_state0
@@ -298,12 +301,61 @@ class IRP(object):
             same_state1 = (s[1] == s1[1])
             stable_state1 = (stable_state1 + same_state1)*same_state1
 
-            _, stable1 = Agent1.update_function(game, s, a, s1, pi1[0], stable1, t)
-            _, stable2 = Agent2.update_function(game, s[::-1], a[::-1], s1[::-1], pi2[0], stable2, t)
+            _, stable1 = Agent1.update_function(game, s, a, pi1[0], stable1, t)
+            _, stable2 = Agent2.update_function(game, s[::-1], a[::-1], pi1[1], stable2, t)
             s = s1
             all_visited_states.append(s1)
             if game.check_convergence(game, t, stable1, stable2):
                 break
         return game, s, all_visited_states, all_actions
+    
+    
+    # def simulate_game(self, Agent1, Agent2, game):
+
+    #     """
+    #     Simulate the game between two agents.
+
+    #     Parameters:
+    #     ----------
+    #     Agent1 : object
+    #         First agent with pick_strategies and update_function methods.
+    #     Agent2 : object
+    #         Second agent with pick_strategies and update_function methods.
+
+    #     Returns:
+    #     -------
+    #     tuple
+    #         A tuple containing the final state, all visited states, and all actions taken.
+    #     """
+    #     s = game.s0
+    #     stable1 = 0
+    #     stable2 = 0
+    #     stable_state0 = 0
+    #     stable_state1 = 0
+    #     all_visited_states = []
+    #     all_actions = []
+    #     for t in range(int(game.tmax)):
+    #        # print(f"t = {t} ----------------------------------------------------------------------------------------")
+    #         a1 = Agent1.pick_strategies(game, s, t)
+    #         a2 = Agent2.pick_strategies(game, s[::-1], t)
+    #         a = (a1, a2)
+    #         all_actions.append(a)
+    #         # print(a)
+    #         pi1 = game.PI[a]
+    #         pi2 = game.PI[a[::-1]]
+    #         s1 = a
+    #         same_state0 = (s[0] == s1[0])
+    #         stable_state0 = (stable_state0 + same_state0)*same_state0
+
+    #         same_state1 = (s[1] == s1[1])
+    #         stable_state1 = (stable_state1 + same_state1)*same_state1
+
+    #         _, stable1 = Agent1.update_function(game, s, a, s1, pi1[0], stable1, t)
+    #         _, stable2 = Agent2.update_function(game, s[::-1], a[::-1], s1[::-1], pi2[0], stable2, t)
+    #         s = s1
+    #         all_visited_states.append(s1)
+    #         if game.check_convergence(game, t, stable1, stable2):
+    #             break
+    #     return game, s, all_visited_states, all_actions
 
     

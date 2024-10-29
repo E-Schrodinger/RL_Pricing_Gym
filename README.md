@@ -2,6 +2,11 @@
 
 ### TODO
  - Add state space to Agent class
+ - Add multi-armed bandit
+ - Make Base Class for Metrics
+ - Add animation to the heatmap
+ - Add more custom stuff such as log functions for the metrics
+ - Change flowchart
  - Add time dependent metrics
  - Add a softmax policy for choosing Actions
  - Fix batch SARSA, completely broken
@@ -10,7 +15,7 @@
 
 
 
-### Updates (29/09/2024)
+### Updates (06/10/2024)
  - Added profit evolution graph
 
 ### Updates (29/09/2024)

@@ -1,69 +1,193 @@
+# import sys
+# import numpy as np
+# import matplotlib.pyplot as plt
+# from collections import Counter
+# from Metrics.Simulation_Base import Simulations
+
+# def find_regret(game, Agent1, Agent2, a1_list, a2_list, use_loglog=False, regret_type = "ratio"):
+
+
+#     a1_space = len(Agent1.a1_prices)
+#     a2_space = len(Agent2.a1_prices)
+    
+#     # Calculate total rewards for each action
+#     total_rewards = np.array([
+#         sum(game.compute_profits(np.array([i , a2_list[j]]))[0]
+#             for j in range(len(a2_list)))
+#         for i in range(a1_space)
+#     ])
+#     # print(total_rewards)
+
+#     best_strategy = np.argmax(total_rewards)
+
+#     # Calculate cumulative sums
+#     best_rewards = np.cumsum([
+#         game.compute_profits(np.array([best_strategy , 
+#                         a2_list[j]]))[0]
+#         for j in range(len(a2_list))
+#     ])
+    
+#     actual_rewards = np.cumsum([
+#         game.compute_profits(np.array([a1_list[j] , a2_list[j]]))[0]
+#         for j in range(len(a2_list))
+#     ])
+    
+#     # Calculate regret
+#     if regret_type == "subtract":
+#         regret_over_time = best_rewards - actual_rewards
+#     else:
+#         regret_over_time = 1 - (actual_rewards / best_rewards)
+    
+#     regret_over_time = regret_over_time.tolist()
+
+#     plot_regret(regret_over_time, use_loglog)
+    
+#     return regret_over_time
+
+# def plot_regret(regret_over_time, use_loglog=False):
+#     plt.figure(figsize=(10, 6))
+    
+#     if use_loglog:
+#         plt.loglog(range(1, len(regret_over_time) + 1), regret_over_time)
+#         plt.xlabel('Time steps (log scale)')
+#         plt.ylabel('Regret (log scale)')
+#         plt.title('Regret over Time (Log-Log Plot)')
+#     else:
+#         plt.plot(regret_over_time)
+#         plt.xlabel('Time steps')
+#         plt.ylabel('Regret')
+#         plt.title('Regret over Time')
+    
+#     plt.grid(True)
+#     plt.show()
+
+
+
+    
 import sys
 import numpy as np
 import matplotlib.pyplot as plt
 from collections import Counter
-from Environments.IRP import IRP
+from Metrics.Simulation_Base import Simulations
+from scipy import stats
 
-class Regret_Metric:
-    def __init__(self, game, Agent1, Agent2, **kwargs):
-        """
-        Initialize the Pricing_Metric object.
+def find_regret(game, Agent1, Agent2, a1_lists, a2_lists, use_loglog=False, regret_type="ratio"):
+    """
+    Calculate the average regret over time with confidence intervals for multiple action lists.
 
-        :param game: The game environment
-        :param Agent1: The first agent
-        :param Agent2: The second agent
-        :param kwargs: Additional parameters (e.g., number of iterations)
-        """
-        self.simulation_results = None
-        self.env = game
-        self.Agent1 = Agent1
-        self.Agent2 = Agent2
+    Parameters:
+    - game: The game environment.
+    - Agent1: The first agent.
+    - Agent2: The second agent.
+    - a1_lists: List of lists containing actions for Agent1.
+    - a2_lists: List of lists containing actions for Agent2.
+    - use_loglog: Whether to plot using a log-log scale.
+    - regret_type: Type of regret calculation ("ratio" or "subtract").
 
+    Returns:
+    - mean_regret: The average regret over time.
+    - lower_bound: The lower bound of the confidence interval.
+    - upper_bound: The upper bound of the confidence interval.
+    """
+    if len(a1_lists) != len(a2_lists):
+        raise ValueError("The number of a1_lists and a2_lists must be the same.")
 
-    def find_regret(self, a1_list, a2_list):
-    
+    all_regrets = []
 
-        action_space = len(self.env.init_actions())
-        # print(f"Action space: {action_space}")
-        
+    for idx, (a1_list, a2_list) in enumerate(zip(a1_lists, a2_lists)):
+        # Determine the length of the current pair
+        current_length = min(len(a1_list), len(a2_list))
+        if current_length == 0:
+            continue  # Skip if no actions
+
         # Calculate total rewards for each action
+        a1_space = len(Agent1.a1_prices)
+        a2_space = len(Agent2.a1_prices)
+
         total_rewards = np.array([
-            sum(self.env.PI[tuple([i , a2_list[j]])][0]
-                for j in range(len(a2_list)))
-            for i in range(action_space)
+            sum(game.compute_profits(np.array([i, a2_list[j]]))[0] for j in range(len(a2_list)))
+            for i in range(a1_space)
         ])
-        print(total_rewards)
 
         best_strategy = np.argmax(total_rewards)
 
         # Calculate cumulative sums
         best_rewards = np.cumsum([
-            self.env.PI[tuple([best_strategy , 
-                            a2_list[j]])][0]
-            for j in range(len(a2_list))
+            game.compute_profits(np.array([best_strategy, a2_list[j]]))[0]
+            for j in range(current_length)
         ])
-        
+
         actual_rewards = np.cumsum([
-            self.env.PI[tuple([a1_list[j] , a2_list[j]])][0]
-            for j in range(len(a2_list))
+            game.compute_profits(np.array([a1_list[j], a2_list[j]]))[0]
+            for j in range(current_length)
         ])
-        
+
         # Calculate regret
-        regret_over_time = 1 - (actual_rewards / best_rewards)
-        
-        return regret_over_time.tolist()
+        if regret_type == "subtract":
+            regret_over_time = best_rewards - actual_rewards
+        else:
+            # To avoid division by zero, replace zero best_rewards with np.nan
+            safe_best_rewards = np.where(best_rewards == 0, np.nan, best_rewards)
+            regret_over_time = 1 - (actual_rewards / safe_best_rewards)
 
-    def plot_regret(self, regret_over_time):
-            plt.figure(figsize=(10, 6))
-            plt.plot(regret_over_time)
-            plt.xlabel('Time steps')
-            plt.ylabel('Regret')
-            plt.title('Regret over Time')
-            plt.grid(True)
-            plt.show()
+        regret_over_time = regret_over_time.tolist()
+        all_regrets.append(regret_over_time)
 
+    if not all_regrets:
+        raise ValueError("No valid action lists provided.")
 
-    
-   
+    # Determine the maximum length among all regret lists
+    max_length = max(len(regret) for regret in all_regrets)
+
+    # Initialize a 2D array with NaNs
+    regret_matrix = np.full((len(all_regrets), max_length), np.nan)
+
+    # Populate the matrix with regret values
+    for i, regret in enumerate(all_regrets):
+        regret_matrix[i, :len(regret)] = regret
+
+    # Calculate mean and confidence intervals, ignoring NaNs
+    mean_regret = np.nanmean(regret_matrix, axis=0)
+    std_regret = np.nanstd(regret_matrix, axis=0)
+    n = np.sum(~np.isnan(regret_matrix), axis=0)
+    confidence = 0.95
+    stderr = std_regret / np.sqrt(n)
+    t_multiplier = stats.t.ppf((1 + confidence) / 2., n-1)
+    lower_bound = mean_regret - t_multiplier * stderr
+    upper_bound = mean_regret + t_multiplier * stderr
+
+    plot_average_regret(mean_regret, lower_bound, upper_bound, use_loglog)
+
+    return mean_regret, lower_bound, upper_bound
+
+def plot_average_regret(mean_regret, lower_bound, upper_bound, use_loglog=False):
+    """
+    Plot the average regret over time with confidence intervals.
+
+    Parameters:
+    - mean_regret: The average regret over time.
+    - lower_bound: The lower bound of the confidence interval.
+    - upper_bound: The upper bound of the confidence interval.
+    - use_loglog: Whether to plot using a log-log scale.
+    """
+    plt.figure(figsize=(10, 6))
+    time_steps = np.arange(1, len(mean_regret) + 1)
+
+    if use_loglog:
+        plt.loglog(time_steps, mean_regret, label='Average Regret')
+        plt.fill_between(time_steps, lower_bound, upper_bound, alpha=0.3, label='95% Confidence Interval')
+        plt.xlabel('Time steps (log scale)')
+        plt.ylabel('Regret (log scale)')
+        plt.title('Average Regret over Time with Confidence Intervals (Log-Log Plot)')
+    else:
+        plt.plot(time_steps, mean_regret, label='Average Regret')
+        plt.fill_between(time_steps, lower_bound, upper_bound, alpha=0.3, label='95% Confidence Interval')
+        plt.xlabel('Time steps')
+        plt.ylabel('Regret')
+        plt.title('Average Regret over Time with Confidence Intervals')
+
+    plt.legend()
+    plt.grid(True, which="both", ls="--", linewidth=0.5)
+    plt.show()
     
 
