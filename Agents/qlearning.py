@@ -17,7 +17,7 @@ class Q_Learning(QBase):
     This class provides methods for initializing, updating, and using a Q-function
     to make decisions in a game-theoretic context.
 
-    Attributes:
+    Attributes
     ----------
     delta : float
         Discount factor for future rewards (default: 0.95).
@@ -33,7 +33,7 @@ class Q_Learning(QBase):
         """
         Initialize the Q-learning agent.
 
-        Parameters:
+        Parameters
         ----------
         game : object
             The game environment.
@@ -47,39 +47,37 @@ class Q_Learning(QBase):
         super().__init__(game, **kwargs)
 
 
-    
-    
     def reset(self, game):
         """
         Reset the Q-function to its initial state.
 
-        Parameters:
+        Parameters
         ----------
         game : object
             The game environment.
         """
         self.Q = self.make_Q()
-        self.price_state_space = copy.copy(self.a1_space)
+        self.state_space = copy.copy(self.a1_space)
     
     def pick_strategies(self, game, p, t):
         """
         Choose actions based on the current Q-function and exploration strategy.
 
-        This method implements an epsilon-greedy strategy with decaying exploration rate.
+        This method implements an epsilon-greedy strategy with a decaying exploration rate.
 
-        Parameters:
+        Parameters
         ----------
         game : object
             The game environment.
-        s : tuple
-            Current state.
+        p : tuple
+            Current players' profiles or actions.
         t : int
             Current time step.
 
-        Returns:
+        Returns
         -------
-        ndarray
-            Chosen actions for each player.
+        int
+            Chosen action for the player.
         """
         s = (self.get_index_1(p[0]), self.get_index_2(p[1]))
         a = np.zeros(1)
@@ -87,9 +85,9 @@ class Q_Learning(QBase):
         pr_explore = np.exp(- t * self.beta)
         # pr_explore = 0.1  # Alternatively, use a fixed exploration rate
         
-        # Determine whether to explore or exploit for each player
+        # Determine whether to explore or exploit
         e = (pr_explore > np.random.rand())
-        
+
         if e:
             # Explore: choose a random action
             a = np.random.randint(0, self.k)
@@ -97,8 +95,8 @@ class Q_Learning(QBase):
             # Exploit: choose the action with the highest Q-value
             a = np.argmax(self.Q[tuple(s)])
     
-        a_price = self.a1_space[a]
-        return a_price
+        self.a_price = self.a1_space[a]
+        return self.a_price
     
     def update_function(self, game, p, a_prices, pi, stable, t, tol=1e-5):
         """
@@ -106,16 +104,14 @@ class Q_Learning(QBase):
 
         This method implements the Q-learning update rule and checks for convergence.
 
-        Parameters:
+        Parameters
         ----------
         game : object
             The game environment.
-        s : tuple
-            Current state.
-        a : tuple
-            Chosen actions.
-        s1 : tuple
-            Next state.
+        p : tuple
+            Current players' profiles or actions.
+        a_prices : tuple
+            Chosen action prices for the players.
         pi : ndarray
             Observed payoffs.
         stable : int
@@ -123,9 +119,9 @@ class Q_Learning(QBase):
         t : int
             Current time step.
         tol : float, optional
-            Tolerance for considering Q-values as converged (default: 1e-1).
+            Tolerance for considering Q-values as converged (default: 1e-5).
 
-        Returns:
+        Returns
         -------
         tuple
             Updated Q-function and stability counter.
@@ -141,8 +137,9 @@ class Q_Learning(QBase):
         old_value = self.Q[subj_state]
         # Compute the maximum Q-value for the next state
         
+        
         max_q1 = np.max(self.Q[tuple(a)])
-       
+    
         
         # Compute the new Q-value using the Q-learning update rule
         new_value = pi + self.delta * max_q1
@@ -152,7 +149,7 @@ class Q_Learning(QBase):
         self.Q[subj_state] = (1 - game.alpha) * old_value + game.alpha * new_value
         
         # Check for stability (convergence)
-        same_q = np.allclose(old_q, self.Q, tol)
+        same_q = np.allclose(old_q, self.Q, atol=tol)
         stable = (stable + same_q) * same_q  # Reset to 0 if not stable, increment if stable
     
         return self.Q, stable

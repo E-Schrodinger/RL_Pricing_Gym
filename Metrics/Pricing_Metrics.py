@@ -4,15 +4,37 @@ import matplotlib.pyplot as plt
 from collections import Counter
 import pandas as pd
 import networkx as nx
-
-
+from scipy import stats
+from Environments.IRP import IRP
+import seaborn as sns
 
 
 def average_price(game, Agent1, Agent2, a1_list, a2_list):
     """
     Calculate the average price set by each agent over all simulations.
 
-    :return: Tuple of average prices (Agent1, Agent2)
+    This function computes the average price that each agent sets during the 
+    stable period of each simulation. The stable period is defined by the last
+    `tstable` time steps of each simulation.
+
+    Parameters
+    ----------
+    game : object
+        The game environment containing simulation parameters such as `tstable`.
+    Agent1 : object
+        The first agent participating in the simulations.
+    Agent2 : object
+        The second agent participating in the simulations.
+    a1_list : list of lists
+        A list where each sublist contains the actions taken by Agent1 in a simulation.
+    a2_list : list of lists
+        A list where each sublist contains the actions taken by Agent2 in a simulation.
+
+    Returns
+    -------
+    tuple
+        A tuple containing the average prices set by Agent1 and Agent2 respectively.
+        Format: (avg_price1, avg_price2)
     """
     
     iterations = len(a1_list)
@@ -21,8 +43,8 @@ def average_price(game, Agent1, Agent2, a1_list, a2_list):
     single_iter_average2 = 0
     for i in range(iterations):
         # Calculate average price for the stable period in each simulation
-        single_iter_average1 += np.sum([a for a in a1_list[i][-int(game.tstable):]])/int(game.tstable)
-        single_iter_average2 += np.sum([a for a in a2_list[i][-int(game.tstable):]])/int(game.tstable)
+        single_iter_average1 += np.sum([a for a in a1_list[i][-int(game.tstable):]]) / int(game.tstable)
+        single_iter_average2 += np.sum([a for a in a2_list[i][-int(game.tstable):]]) / int(game.tstable)
     
     # Calculate overall average prices
     avg_price1 = single_iter_average1 / iterations
@@ -33,183 +55,33 @@ def average_price(game, Agent1, Agent2, a1_list, a2_list):
 
     return avg_price1, avg_price2
 
-def create_heatmap( joint_state_keys, joint_state_counts):
+
+def create_directed_network_graph(adj_matrix, node_labels):
     """
-    Create a heatmap of joint state distributions.
+    Create and display a directed network graph based on an adjacency matrix.
 
-    :param joint_state_keys: List of joint state tuples
-    :param joint_state_counts: List of counts for each joint state
+    This function generates a directed graph using NetworkX from the provided 
+    adjacency matrix. Nodes are labeled as specified, and the graph is visualized 
+    using Matplotlib with a spring layout for better organization.
+
+    Parameters
+    ----------
+    adj_matrix : numpy.ndarray
+        Adjacency matrix representing the connections between nodes.
+    node_labels : list of str
+        List of labels for each node in the graph. The length must match the 
+        number of nodes in the adjacency matrix.
+
+    Raises
+    ------
+    ValueError
+        If the number of labels does not match the number of nodes in the adjacency matrix.
+
+    Returns
+    -------
+    None
+        Displays the directed network graph plot.
     """
-    # Find the maximum state indices
-    max_state1 = max(key[0] for key in joint_state_keys) + 1
-    max_state2 = max(key[1] for key in joint_state_keys) + 1
-
-    # Create a 2D array for the heatmap
-    heatmap_data = np.zeros((max_state2, max_state1))
-
-    # Fill the heatmap data
-    for key, count in zip(joint_state_keys, joint_state_counts):
-        heatmap_data[key[1], key[0]] = count
-
-    # Create the heatmap
-    fig, ax = plt.subplots(figsize=(10, 8))
-    im = ax.imshow(heatmap_data, cmap='YlOrRd')
-
-    # Set title and labels
-    ax.set_title('Joint State Distribution Heatmap')
-    ax.set_xlabel('Agent 1 States')
-    ax.set_ylabel('Agent 2 States')
-
-    # Add colorbar
-    cbar = ax.figure.colorbar(im, ax=ax)
-    cbar.ax.set_ylabel('State Count', rotation=-90, va="bottom")
-
-    # Add text annotations
-    for i in range(max_state2):
-        for j in range(max_state1):
-            text = ax.text(j, i, f'{heatmap_data[i, j]:.0f}',
-                        ha="center", va="center", color="black")
-
-    # Set ticks
-    ax.set_xticks(np.arange(max_state1))
-    ax.set_yticks(np.arange(max_state2))
-    ax.set_xticklabels(np.arange(max_state1))
-    ax.set_yticklabels(np.arange(max_state2))
-
-    # Rotate the tick labels and set their alignment
-    plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
-
-    # Adjust layout and display the plot
-    plt.tight_layout()
-    plt.show()
-
-def state_heatmap(self):
-    """
-    Generate a heatmap of joint state distributions.
-
-    :return: List of joint state counts
-    """
-    self.run_simulations()
-
-    sdim, _ = self.env.init_state()
-
-    # Initialize joint state counts
-    joint_state_counts = [0] * (sdim[0] * sdim[0])
-    joint_state_keys = [(i, j) for i in range(sdim[0]) for j in range(sdim[0])]
-
-    # Count joint states in the stable period of each simulation
-    for all_visited_states, _ in self.simulation_results:
-        joint_counted = all_visited_states[-int(self.env.tstable):]
-        joint_count = Counter(joint_counted)
-        
-        for i, key in enumerate(joint_state_keys):
-            joint_state_counts[i] += joint_count.get(key, 0)
-
-    self.create_heatmap(joint_state_keys, joint_state_counts)
-
-    return joint_state_counts
-
-def Make_Q( index):
-    """
-    Create a DataFrame of Q-values for the specified agent.
-
-    :param index: 0 for Agent1, 1 for Agent2
-    :return: DataFrame of Q-values
-    """
-    if self.simulation_results == None and self.single_results == None:
-        self.single_results = []
-        self.Q_vals_1 = []
-        self.Q_vals_2 = []
-
-        self.agent1_is_q = self.has_q_vals(self.Agent1)
-        self.agent2_is_q = self.has_q_vals(self.Agent2)
-
-        # Run simulations for the specified number of iterations
-        for _ in range(1):
-            self.Agent1.reset(self.env)
-            self.Agent2.reset(self.env)
-            self.env, s, all_visited_states, all_actions = self.env.simulate_game(self.Agent1, self.Agent2, self.env)
-            self.single_results.append((all_visited_states, all_actions))
-
-            # Store Q-values if agents use Q-learning or SARSA
-            if self.agent1_is_q:
-                self.Q_vals_1.append(self.Agent1.Q.copy())
-            else:
-                self.Q_vals_1.append(None)
-
-            if self.agent2_is_q:
-                self.Q_vals_2.append(self.Agent2.Q.copy())
-            else:
-                self.Q_vals_2.append(None)
-
-    else:
-        self.run_simulations()
-
-    if index == 0:
-        Qvals = self.Q_vals_1[-1]
-    elif index == 1:
-        Qvals = self.Q_vals_2[-1]
-
-    sdim, _ = self.env.init_state()
-
-    column_names = []
-
-    # Generate state indices
-    state_indices = []
-    for i in range(sdim[0]):
-            for j in range(sdim[0]):
-                state_indices.append((i,j))
-    agent1_states = [state[0] for state in state_indices]
-    agent2_states = [state[1] for state in state_indices]
-
-    array_list = [agent1_states,agent2_states]
-
-    # Create column names
-    for i in range(self.env.n):
-        column_names.append(f"Agent {i+1} State")
-
-    if index == 1:
-        column_names.reverse()
-
-    # Add Q-values for each action
-    for k in range(len(self.env.init_actions())):
-        column_names.append(f"{k}")
-
-        action_list = []
-
-        for i in range(sdim[0]):
-            for j in range(sdim[0]):
-                action_list.append(Qvals[(i,j)][k])
-        
-        array_list.append(action_list)
-    
-    # Create DataFrame
-    data_dict = {name: arr for name, arr in zip(column_names, array_list)}
-    df = pd.DataFrame(data_dict)
-
-    return df
-
-def Q_table( index = 0):
-    """
-    Return the Q-values for the specified agent.
-
-    :param index: 0 for Agent1, 1 for Agent2
-    :return: DataFrame of Q-values or None if agent doesn't use Q-learning
-    """
-    if index == 0:
-        Agent = self.Agent1
-    elif index == 1:
-        Agent = self.Agent2
-    
-    if self.has_q_vals(Agent):
-        generated_Q_vals = self.Make_Q(index)
-        return generated_Q_vals
-    else:
-        print(f"Agent {index + 1} has no Q Values")
-        return None
-
-
-def create_directed_network_graph( adj_matrix, node_labels):
     if len(node_labels) != len(adj_matrix):
         raise ValueError("The number of labels must match the number of nodes in the matrix.")
 
@@ -223,7 +95,7 @@ def create_directed_network_graph( adj_matrix, node_labels):
     # Set up the plot
     plt.figure(figsize=(10, 10))
 
-    # Use a circular layout for better organization
+    # Use a spring layout for better organization
     pos = nx.spring_layout(G, k=0.5, iterations=20) 
     # pos = nx.kamada_kawai_layout(G, scale = 5)
 
@@ -242,39 +114,294 @@ def create_directed_network_graph( adj_matrix, node_labels):
     # Show the plot
     plt.show()
 
-def make_adjency(game, Agent1, Agent2, a1_list, a2_list):
 
+def make_adjacency(Agent1, Agent2, Q1, Q2, labels='index', plot_graph=False):
+    """
+    Create an adjacency matrix representing interactions between two agents based on their Q-values.
 
+    This function constructs an adjacency matrix where each node represents a joint action 
+    of both agents. An edge from node X to node Y exists if the joint action Y is the 
+    greedy response based on the Q-values of both agents when the current joint action is X.
 
-    Qvals1 = self.Q_vals_1[-1]
+    Parameters
+    ----------
+    Agent1 : object
+        The first agent, which must have Q-values.
+    Agent2 : object
+        The second agent, which must have Q-values.
+    Q1 : numpy.ndarray
+        Q-values for Agent1, indexed by state-action pairs.
+    Q2 : numpy.ndarray
+        Q-values for Agent2, indexed by state-action pairs.
+    labels : str, optional
+        Labeling scheme for nodes. Options:
+            - 'price': Labels nodes with their joint action prices.
+            - 'index': Labels nodes with their joint action indices.
+        Default is 'index'.
+    plot_graph : bool, optional
+        If True, creates and displays a directed network graph of the adjacency matrix.
+        Default is False.
 
-    Qvals2 = self.Q_vals_2[-1]
+    Raises
+    ------
+    ValueError
+        If either Agent1 or Agent2 does not use Q-values.
 
+    Returns
+    -------
+    numpy.ndarray
+        Adjacency matrix representing interactions between agents.
+        Shape: (len1*len2, len1*len2)
+    """
+    # Check if both agents have Q-values
+    def has_q_vals(agent):
+        return (type(agent).__name__ in ['Q_Learning', 'Batch_SARSA', 'Dec_Q'] or
+                any(base.__name__ in ['Q_Learning', 'Batch_SARSA', 'Dec_Q'] for base in type(agent).__bases__))
 
-    adj_matrix = np.zeros((self.env.k*self.env.k, self.env.k*self.env.k))
+    if not has_q_vals(Agent1) or not has_q_vals(Agent2):
+        raise ValueError("Both agents must have Q-values.")
+
+    len1 = len(Agent1.a1_space)
+    len2 = len(Agent2.a1_space)
+
+    act1 = Agent1.a1_space
+    act2 = Agent2.a1_space
 
     node_names = []
+    if labels == 'price':
+        for i in range(len1):
+            for j in range(len2):
+                node_names.append(f"({act1[i]},{act2[j]})")
+    elif labels == 'index':
+        for i in range(len1):
+            for j in range(len2):
+                node_names.append(f"({i},{j})")
+    else:
+        raise ValueError("labels must be either 'price' or 'index'.")
 
-    for i in range(self.env.k):
-        for j in range(self.env.k):
-            node_names.append(f"({i},{j})")
+    adj_matrix = np.zeros((len1 * len2, len1 * len2))
 
-    for i in range(self.env.k):
-        for j in range(self.env.k):
-        #     print(Qvals1[tuple((i,j))])
-        #     print(Qvals2[tuple((i,j))])
-            x = (i*(self.env.k) + j)
-            y = (np.argmax(Qvals1[tuple((i,j))])*(self.env.k) + np.argmax(Qvals2[tuple((i,j))]))
-            # print(f"x = {x}, y = {y}")
-            adj_matrix[x,y] = 1
-    
-    self.create_directed_network_graph(adj_matrix, node_names)
+    for i in range(len1):
+        for j in range(len2):
+            x = (i * len2 + j)
+
+            price1 = act1[i]
+            price2 = act2[j]
+
+            idx1 = (Agent1.get_index_1(price1), Agent1.get_index_2(price2))
+            idx2 = (Agent2.get_index_1(price2), Agent2.get_index_2(price1))
+            
+            try:
+                y = (np.argmax(Q1[idx1]) * len2 + np.argmax(Q2[idx2]))
+                adj_matrix[x, y] = 1
+            except IndexError:
+                # Handle cases where indices are out of bounds
+                continue
+
+    if plot_graph:
+        create_directed_network_graph(adj_matrix, node_names)
+
+    return adj_matrix
+
+
+def check_rp(adj_matrix):
+    """
+    Check certain properties of the directed graph represented by the adjacency matrix.
+
+    This function evaluates the graph to determine if it satisfies the following conditions:
+    1. The Nash node is within the largest weakly connected component.
+    2. There exists at least one limiting strongly connected component.
+    3. The Nash node is not part of any limiting strongly connected component.
+
+    Parameters
+    ----------
+    adj_matrix : numpy.ndarray
+        Adjacency matrix representing the directed graph.
+
+    Returns
+    -------
+    int
+        Returns 1 if all conditions are satisfied, otherwise returns 0.
+    """
+    # Step 1: Create the directed graph from the adjacency matrix
+    G = nx.DiGraph(adj_matrix)
+
+    # Find all weakly connected components
+    weakly_connected_components = list(nx.weakly_connected_components(G))
+
+    if not weakly_connected_components:
+        return 0  # No connected components
+
+    # Identify the largest weakly connected component
+    largest_wcc = max(weakly_connected_components, key=len)
+
+    # Create a subgraph of the largest weakly connected component
+    subG = G.subgraph(largest_wcc).copy()
+
+    # Step 2: Find strongly connected components within the subgraph
+    sccs = list(nx.strongly_connected_components(subG))
+
+    # Identify limiting nodes or limiting cycles
+    limiting_sccs = []
+    for scc in sccs:
+        is_limiting = True
+        for node in scc:
+            out_edges = subG.out_edges(node)
+            for _, v in out_edges:
+                if v not in scc:
+                    is_limiting = False
+                    break
+            if not is_limiting:
+                break
+        if is_limiting:
+            limiting_sccs.append(scc)
+
+    # Check if there's at least one limiting node or cycle
+    has_limiting_scc = len(limiting_sccs) > 0
+
+    if not has_limiting_scc:
+        return 0  # No limiting strongly connected components
+
+    # Step 3: Find the Nash node (node with the maximum in-degree)
+    in_degrees = dict(G.in_degree())
+    max_in_degree = max(in_degrees.values())
+    nash_nodes = [node for node, deg in in_degrees.items() if deg == max_in_degree]
+    nash_node = nash_nodes[0]  # You can pick any if multiple nodes have the same in-degree
+
+    # Check if the Nash node is in the largest weakly connected component
+    nash_in_wcc = nash_node in largest_wcc
+
+    # Step 4: Ensure the Nash node is not in any limiting SCC
+    nash_in_limiting_scc = any(nash_node in scc for scc in limiting_sccs)
+
+    # Step 5: Return 1 if all conditions are satisfied, else 0
+    if nash_in_wcc and has_limiting_scc and not nash_in_limiting_scc:
+        return 1
+    else:
+        return 0
+
+
+def plot_rp(Agent1_list, Agent2_list, Q1_list, Q2_list, time_step=1):
+    """
+    Process Q-values from two agents, compute the averaged check_rp values per time step, and plot the results.
+
+    This function evaluates the adjacency matrices derived from agents' Q-values at specified time steps,
+    computes the `check_rp` metric for each, averages these metrics across all trajectories, and
+    visualizes the average `check_rp` values over time.
+
+    Parameters
+    ----------
+    Agent1_list : list of lists
+        List where each sublist contains instances of Agent1 at different time steps in a simulation.
+    Agent2_list : list of lists
+        List where each sublist contains instances of Agent2 at different time steps in a simulation.
+    Q1_list : list of lists
+        List where each sublist contains Q-values for Agent1 at different time steps in a simulation.
+    Q2_list : list of lists
+        List where each sublist contains Q-values for Agent2 at different time steps in a simulation.
+    time_step : int, optional
+        The interval of time steps to consider for evaluation (default is 1).
+
+    Returns
+    -------
+    list
+        A list of averaged `check_rp` values per specified time step.
+    """
+    num_trajectories = len(Q1_list)
+    assert num_trajectories == len(Q2_list), "Q1_list and Q2_list must have the same number of trajectories."
+
+    # Get lengths of all trajectories to find the maximum length
+    lengths = [len(traj) for traj in Q1_list]
+    max_length = max(lengths)
+
+    # Initialize list to store check_rp values per time step
+    check_rp_values_per_time_step = []
+
+    # Time steps to consider based on the user-defined time_step interval
+    time_steps = range(0, max_length, time_step)
+
+    for t in time_steps:
+        check_rp_values_at_t = []
+        for x in range(num_trajectories):
+            traj_length = lengths[x]
+
+            # If the trajectory is shorter, use the last Q-value
+            if t < traj_length:
+                Agent1 = Agent1_list[x][t]
+                Agent2 = Agent2_list[x][t]
+                Q1 = Q1_list[x][t]
+                Q2 = Q2_list[x][t]
+            else:
+                Agent1 = Agent1_list[x][-1]
+                Agent2 = Agent2_list[x][-1]
+                Q1 = Q1_list[x][-1]
+                Q2 = Q2_list[x][-1]
+
+            # Compute the adjacency matrix using the predefined function
+            adj_matrix = make_adjacency(Agent1, Agent2, Q1, Q2)
+
+            # Compute the check_rp value
+            check_rp_value = check_rp(adj_matrix)
+
+            # Append the check_rp value for this trajectory at time t
+            check_rp_values_at_t.append(check_rp_value)
+
+        # Compute the average check_rp value across all trajectories for time t
+        avg_check_rp = sum(check_rp_values_at_t) / num_trajectories
+        check_rp_values_per_time_step.append(avg_check_rp)
+
+    # Plot the averaged check_rp values over time
+    plt.figure(figsize=(10, 6))
+    plt.plot([t for t in time_steps], check_rp_values_per_time_step, marker='o')
+    plt.xlabel('Time Step')
+    plt.ylabel('Average check_rp Value')
+    plt.title('Average check_rp Value over Time')
+    plt.grid(True)
+    plt.show()
+
+    return check_rp_values_per_time_step
+
 
 def profit_graph(game, Agent1, Agent2, a1_lists, a2_lists):
+    """
+    Plot the average profit over time for both players with confidence intervals.
+
+    This function calculates the profits for each agent at every time step across all simulations,
+    computes the mean and confidence intervals, and visualizes the average profits for both agents
+    over time.
+
+    Parameters
+    ----------
+    game : object
+        The game environment, which must have a `compute_profits` method.
+    Agent1 : object
+        The first agent participating in the simulations.
+    Agent2 : object
+        The second agent participating in the simulations.
+    a1_lists : list of lists
+        List where each sublist contains the actions taken by Agent1 in a simulation.
+    a2_lists : list of lists
+        List where each sublist contains the actions taken by Agent2 in a simulation.
+
+    Returns
+    -------
+    dict
+        A dictionary containing:
+            - 'time': numpy.ndarray of time steps.
+            - 'mean_player1_profits': numpy.ndarray of mean profits for Player 1.
+            - 'mean_player2_profits': numpy.ndarray of mean profits for Player 2.
+            - 'lower_bound_player1': numpy.ndarray of lower confidence interval for Player 1.
+            - 'upper_bound_player1': numpy.ndarray of upper confidence interval for Player 1.
+            - 'lower_bound_player2': numpy.ndarray of lower confidence interval for Player 2.
+            - 'upper_bound_player2': numpy.ndarray of upper confidence interval for Player 2.
+    """
     # Ensure a1_lists and a2_lists have the same length
-    assert len(a1_lists) == len(a2_lists), "a1_lists and a2_lists must have the same length"
+    if len(a1_lists) != len(a2_lists):
+        raise ValueError("The number of a1_lists and a2_lists must be the same.")
     
     num_simulations = len(a1_lists)
+    
+    # Determine the maximum simulation length
     max_length = max(max(len(sim) for sim in a1_lists), max(len(sim) for sim in a2_lists))
     
     # Initialize arrays to store profits
@@ -282,34 +409,65 @@ def profit_graph(game, Agent1, Agent2, a1_lists, a2_lists):
     player2_profits = np.full((num_simulations, max_length), np.nan)
     
     # Calculate profits for each simulation
-    for i in range(num_simulations):
-        profit_list = [game.compute_profits(np.array([p1,p2])) for p1,p2 in zip(a1_lists[i], a2_lists[i])]
-        sim_length = len(profit_list)
-        player1_profits[i, :sim_length] = [profit[0] for profit in profit_list]
-        player2_profits[i, :sim_length] = [profit[1] for profit in profit_list]
+    for i, (a1_list, a2_list) in enumerate(zip(a1_lists, a2_lists)):
+        # Determine the length of the current simulation
+        current_length = min(len(a1_list), len(a2_list))
+        if current_length == 0:
+            continue  # Skip if no actions
+        
+        profit_list = [game.compute_profits(np.array([p1, p2])) for p1, p2 in zip(a1_list[:current_length], a2_list[:current_length])]
+        
+        player1_profits[i, :current_length] = [profit[0] for profit in profit_list]
+        player2_profits[i, :current_length] = [profit[1] for profit in profit_list]
     
-    # Calculate average profits, ignoring NaN values
-    avg_player1_profits = np.nanmean(player1_profits, axis=0)
-    avg_player2_profits = np.nanmean(player2_profits, axis=0)
+    # Calculate mean profits, ignoring NaN values
+    mean_player1_profits = np.nanmean(player1_profits, axis=0)
+    mean_player2_profits = np.nanmean(player2_profits, axis=0)
     
-    # Calculate standard deviation for error bars, ignoring NaN values
-    std_player1_profits = np.nanstd(player1_profits, axis=0)
-    std_player2_profits = np.nanstd(player2_profits, axis=0)
+    # Calculate standard deviation and standard error, ignoring NaN values
+    std_player1_profits = np.nanstd(player1_profits, axis=0, ddof=1)
+    std_player2_profits = np.nanstd(player2_profits, axis=0, ddof=1)
+    
+    n_player1 = np.sum(~np.isnan(player1_profits), axis=0)
+    n_player2 = np.sum(~np.isnan(player2_profits), axis=0)
+    
+    # Avoid division by zero
+    stderr_player1 = np.where(n_player1 > 1, std_player1_profits / np.sqrt(n_player1), np.nan)
+    stderr_player2 = np.where(n_player2 > 1, std_player2_profits / np.sqrt(n_player2), np.nan)
+    
+    # Compute t-multiplier for confidence intervals
+    confidence = 0.95
+    df_player1 = n_player1 - 1
+    df_player2 = n_player2 - 1
+    
+    # Handle degrees of freedom <=0
+    t_multiplier_player1 = np.where(df_player1 > 0, stats.t.ppf((1 + confidence) / 2., df_player1), np.nan)
+    t_multiplier_player2 = np.where(df_player2 > 0, stats.t.ppf((1 + confidence) / 2., df_player2), np.nan)
+    
+    # Compute confidence intervals
+    lower_bound_player1 = mean_player1_profits - t_multiplier_player1 * stderr_player1
+    upper_bound_player1 = mean_player1_profits + t_multiplier_player1 * stderr_player1
+    
+    lower_bound_player2 = mean_player2_profits - t_multiplier_player2 * stderr_player2
+    upper_bound_player2 = mean_player2_profits + t_multiplier_player2 * stderr_player2
     
     # Create a time list
-    time = np.arange(max_length)
+    time = np.arange(1, max_length + 1)
     
     # Create the plot
     plt.figure(figsize=(12, 7))
     
-    # Plot average profits with error bars
-    plt.errorbar(time, avg_player1_profits, yerr=std_player1_profits, label='Player 1', marker='o', capsize=5, capthick=1, elinewidth=1)
-    plt.errorbar(time, avg_player2_profits, yerr=std_player2_profits, label='Player 2', marker='s', capsize=5, capthick=1, elinewidth=1)
-
+    # Plot average profits with confidence intervals
+    plt.plot(time, mean_player1_profits, label='Player 1')
+    plt.fill_between(time, lower_bound_player1, upper_bound_player1, alpha=0.3)
+    
+    plt.plot(time, mean_player2_profits, label='Player 2')
+    plt.fill_between(time, lower_bound_player2, upper_bound_player2, alpha=0.3)
+    
     # Add labels and title
     plt.xlabel('Time')
     plt.ylabel('Average Profit')
-    plt.title('Average Profit over Time for Both Players')
+    plt.title('Average Profit over Time for Both Players with Confidence Intervals')
     
     # Add legend
     plt.legend()
@@ -319,22 +477,178 @@ def profit_graph(game, Agent1, Agent2, a1_lists, a2_lists):
     
     # Show the plot
     plt.show()
-
+    
     # Return the data for further analysis if needed
     return {
         'time': time,
-        'avg_player1_profits': avg_player1_profits,
-        'avg_player2_profits': avg_player2_profits,
-        'std_player1_profits': std_player1_profits,
-        'std_player2_profits': std_player2_profits
+        'mean_player1_profits': mean_player1_profits,
+        'mean_player2_profits': mean_player2_profits,
+        'lower_bound_player1': lower_bound_player1,
+        'upper_bound_player1': upper_bound_player1,
+        'lower_bound_player2': lower_bound_player2,
+        'upper_bound_player2': upper_bound_player2
     }
 
 
+def simulate_deviation(game, Agent1, Agent2, tdeviate, tmax, deviated_price=0, deviated_index=0, index=True):
+    """
+    Simulate a deviation in Agent1's strategy and plot the resulting actions over time.
 
-    
+    This function forces Agent1 to set a specific price either by index or by explicit value
+    for the first `tdeviate` time steps. After the deviation period, Agent1 resumes its
+    normal strategy. The actions of both agents are recorded and plotted over the simulation period.
+
+    Parameters
+    ----------
+    game : object
+        The game environment, which must have a `compute_profits` method.
+    Agent1 : object
+        The first agent, whose actions will be deviated.
+    Agent2 : object
+        The second agent participating in the simulation.
+    tdeviate : int
+        The number of initial time steps during which Agent1's action is deviated.
+    tmax : int
+        The total number of time steps to simulate.
+    deviated_price : float, optional
+        The specific price value Agent1 should set during the deviation period. Used if `index` is False.
+        Default is 0.
+    deviated_index : int, optional
+        The index of the price in Agent1's action space to set during the deviation period.
+        Used if `index` is True. Default is 0.
+    index : bool, optional
+        Determines whether to use the `deviated_index` or `deviated_price` for deviation.
+        If True, uses `deviated_index`; otherwise, uses `deviated_price`. Default is True.
+
+    Returns
+    -------
+    None
+        Displays a plot of Agent1 and Agent2's actions over time.
+    """
+    if index:
+        fixed_price = Agent1.a1_space[deviated_index]
+    else:
+        fixed_price = deviated_price
+
+    all_actions = []
+    a1_values = []
+    a2_values = []
+
+    for t in range(int(tmax)):
+        tbig = 1000000
+
+        s = (Agent1.a_price, Agent2.a_price)
+
+        if t <= tdeviate:
+            a1 = fixed_price  
+        else:
+            a1 = Agent1.pick_strategies(game, s, tbig)
+
+        a2 = Agent2.pick_strategies(game, s[::-1], tbig)
+
+        a = (a1, a2)
+        a_prof = np.array([a1, a2])
+        all_actions.append(a)
+        a1_values.append(a1)
+        a2_values.append(a2)
+        pi1 = game.compute_profits(a_prof)
+        s = a
+
+    print(a1_values)
+    print(a2_values)
+    plt.figure(figsize=(10, 6))
+    plt.plot(range(len(a1_values)), a1_values, label='Agent 1')
+    plt.plot(range(len(a2_values)), a2_values, label='Agent 2')
+    # plt.ylim((0,game.k-1))
+    plt.xlabel('Time')
+    plt.ylabel('Action Value')
+    plt.title('Agent Actions Over Time')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
 
 
+def state_heatmap(game, Agent1, Agent2, a1_list, a2_list):
+    """
+    Generate a heatmap of joint state distributions.
 
+    Parameters:
+    ----------
+    game : object
+        The game environment.
+    Agent1 : object
+        The first agent.
+    Agent2 : object
+        The second agent.
+    a1_list : list of lists
+        List of actions taken by Agent1 across simulations.
+    a2_list : list of lists
+        List of actions taken by Agent2 across simulations.
 
+    Returns:
+    -------
+    joint_state_counts : numpy.ndarray
+        2D array of joint state counts.
+    """
 
+    # Initialize joint state counts matrix
+    num_a1_actions = len(Agent1.a1_space)
+    num_a2_actions = len(Agent2.a1_space)
+    joint_state_counts = np.zeros((num_a1_actions, num_a2_actions))
 
+    # Create mappings from action values to indices in the action spaces
+    a1_action_to_index = {action: idx for idx, action in enumerate(Agent1.a1_space)}
+    a2_action_to_index = {action: idx for idx, action in enumerate(Agent2.a1_space)}
+
+    # Count joint states in the stable period of each simulation
+    for sim_idx in range(len(a1_list)):
+        a1_actions = a1_list[sim_idx]
+        a2_actions = a2_list[sim_idx]
+        sim_length = len(a1_actions)
+        # Determine the starting index for the stable period
+        start_idx = max(0, sim_length - int(game.tstable))
+        for step_idx in range(start_idx, sim_length):
+            a1_action = a1_actions[step_idx]
+            a2_action = a2_actions[step_idx]
+
+            # Map actions to indices in the action spaces
+            # Handle cases where the action might not be in the agent's action space
+            a1_index = a1_action_to_index.get(a1_action, None)
+            a2_index = a2_action_to_index.get(a2_action, None)
+
+            # If the action is not found, find the closest action in the action space
+            if a1_index is None:
+                closest_a1_action = Agent1.a1_space[np.argmin(np.abs(Agent1.a1_space - a1_action))]
+                a1_index = a1_action_to_index[closest_a1_action]
+
+            if a2_index is None:
+                closest_a2_action = Agent2.a1_space[np.argmin(np.abs(Agent2.a1_space - a2_action))]
+                a2_index = a2_action_to_index[closest_a2_action]
+
+            # Increment the count for this joint action
+            joint_state_counts[a1_index, a2_index] += 1
+
+    # Normalize counts to probabilities
+    total_counts = np.sum(joint_state_counts)
+    joint_state_probs = joint_state_counts / total_counts if total_counts > 0 else joint_state_counts
+
+    # Prepare labels for the heatmap
+    a1_labels = [f"{action:.2f}" for action in Agent1.a1_space]
+    a2_labels = [f"{action:.2f}" for action in Agent2.a1_space]
+
+    # Create heatmap
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(
+        joint_state_probs,
+        annot=True,
+        fmt=".2f",
+        xticklabels=a2_labels,
+        yticklabels=a1_labels,
+        cmap="YlGnBu"
+    )
+    plt.xlabel("Agent2 Actions")
+    plt.ylabel("Agent1 Actions")
+    plt.title("Joint State Distribution Heatmap")
+    plt.show()
+
+    return joint_state_counts  # Return counts if needed

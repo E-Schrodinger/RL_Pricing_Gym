@@ -111,8 +111,8 @@ class Dec_Q(QBase):
             # Exploit: choose the action with the highest Q-value
             a = np.argmax(self.Q[tuple(s)])
     
-        a_price = self.a1_space[a]
-        return a_price
+        self.a_price = self.a1_space[a]
+        return self.a_price
     
     def X_function(self, game, s, a):
         """

@@ -6,51 +6,40 @@ import numpy as np
 from itertools import product
 from scipy.optimize import fsolve
 import sys
+import copy
 
 
 class IRP(object):
     """
-    model
+    IRP Model
 
     Attributes
     ----------
     n : int
-        number of players
+        Number of players.
     alpha : float
-        product differentiation parameter
+        Product differentiation parameter.
     mu : float
-        product differentiation parameter
+        Product differentiation parameter.
     a : int
-        value of the products
+        Value of the products.
     a0 : float
-        value of the outside option
+        Value of the outside option.
     c : float
-        marginal cost
-    k : int
-        dimension of the grid
-    tstable: int
-        periods of game stability
-    tmax: int
-        maximum iterations of play
+        Marginal cost.
+    tstable : int
+        Periods of game stability.
+    tmax : int
+        Maximum iterations of play.
     dem_function : str or callable
         Demand function to use ('default' or custom function).
-    sdim : tuple
-        Dimensions of the state space.
-    s0 : ndarray
-        Initial state.
-    p_minmax : tuple
-        Competitive and monopoly prices.
-    A : ndarray
-        Discrete action space (possible prices).
-    PI : ndarray
-        Profit matrix for all possible states and actions.
     """
 
-    def __init__(self, dem_function = 'default',**kwargs):
+    def __init__(self, dem_function='default', **kwargs):
         """
         Initialize the IRP model with given or default parameters.
 
-        Parameters:
+        Parameters
         ----------
         dem_function : str or callable, optional
             Demand function to use (default is 'default').
@@ -75,18 +64,16 @@ class IRP(object):
         # self.A = self.init_actions()
         # self.PI = self.init_PI()
 
-        
-
     def demand(self, p):
         """
         Compute the demand for each firm given their prices.
 
-        Parameters:
+        Parameters
         ----------
         p : ndarray
             Array of prices set by each firm.
 
-        Returns:
+        Returns
         -------
         ndarray
             Array of demand quantities for each firm.
@@ -99,12 +86,12 @@ class IRP(object):
         """
         Compute the first-order condition for profit maximization.
 
-        Parameters:
+        Parameters
         ----------
         p : ndarray
             Array of prices set by each firm.
 
-        Returns:
+        Returns
         -------
         ndarray
             Array of first-order condition values.
@@ -120,12 +107,12 @@ class IRP(object):
         """
         Compute the first-order condition for a monopolist.
 
-        Parameters:
+        Parameters
         ----------
         p : ndarray
             Array of prices set by the monopolist for each product.
 
-        Returns:
+        Returns
         -------
         ndarray
             Array of first-order condition values for a monopolist.
@@ -143,7 +130,7 @@ class IRP(object):
         """
         Compute competitive and monopoly prices.
 
-        Returns:
+        Returns
         -------
         tuple
             A tuple containing competitive and monopoly prices.
@@ -157,7 +144,7 @@ class IRP(object):
         """
         Initialize the discrete action space (possible prices).
 
-        Returns:
+        Returns
         -------
         ndarray
             Array of possible prices.
@@ -171,7 +158,7 @@ class IRP(object):
         """
         Initialize the state space dimensions and initial state.
 
-        Returns:
+        Returns
         -------
         tuple
             A tuple containing state space dimensions and initial state.
@@ -184,12 +171,12 @@ class IRP(object):
         """
         Compute profits for each firm given their prices.
 
-        Parameters:
+        Parameters
         ----------
         p : ndarray
             Array of prices set by each firm.
 
-        Returns:
+        Returns
         -------
         ndarray
             Array of profits for each firm.
@@ -198,11 +185,16 @@ class IRP(object):
         pi = (p - self.c) * d
         return pi
 
-    def init_PI(game):
+    def init_PI(self, game):
         """
         Initialize the profit matrix for all possible states and actions.
 
-        Returns:
+        Parameters
+        ----------
+        game : IRP
+            The game environment.
+
+        Returns
         -------
         ndarray
             3D array of profits for all possible states and actions.
@@ -212,7 +204,7 @@ class IRP(object):
             p = np.asarray(game.A[np.asarray(s)])
             PI[s] = game.compute_profits(p)
         return PI
-    
+
     def show_stats(self):
         """
         Display competitive and monopoly prices.
@@ -220,13 +212,15 @@ class IRP(object):
         p_competitive, p_monopoly = self.compute_p_competitive_monopoly()
         print(f"Competitive Price: {p_competitive}")
         print(f"Monopoly Price: {p_monopoly}")
-    
-    def check_convergence(self, game, t, stable1, stable2):
+
+    def check_end(self, game, t, stable1, stable2):
         """
         Check if the game has converged.
 
-        Parameters:
+        Parameters
         ----------
+        game : IRP
+            The game environment.
         t : int
             Current iteration number.
         stable1 : int
@@ -234,7 +228,7 @@ class IRP(object):
         stable2 : int
             Number of stable periods for algorithm 2.
 
-        Returns:
+        Returns
         -------
         bool
             True if the game has converged, False otherwise.
@@ -245,34 +239,43 @@ class IRP(object):
         if stable1 > game.tstable and stable2 > game.tstable:
             print('Both Algorithms Converged!')
             return True
-        if t == game.tmax-1:
+        if t == game.tmax - 1:
             if stable1 > game.tstable:
                 print("Algorithm 1 : Converged. Algorithm 2: Not Converged")
                 return True
             elif stable2 > game.tstable:
                 print("Algorithm 1 : Not Converged. Algorithm 2: Converged")
                 return True
-            
+
             print('ERROR! Not Converged!')
             return True
         return False
 
     def simulate_game(self, Agent1, Agent2, game):
-
         """
         Simulate the game between two agents.
 
-        Parameters:
+        Parameters
         ----------
         Agent1 : object
             First agent with pick_strategies and update_function methods.
         Agent2 : object
             Second agent with pick_strategies and update_function methods.
+        game : IRP
+            The game environment.
 
-        Returns:
+        Returns
         -------
         tuple
-            A tuple containing the final state, all visited states, and all actions taken.
+            A tuple containing:
+            - game: The game environment after simulation.
+            - s: Final state.
+            - all_visited_states: List of all visited states during the simulation.
+            - all_actions: List of all actions taken during the simulation.
+            - all_Q1: List of Agent1's Q-values at each time step.
+            - all_Q2: List of Agent2's Q-values at each time step.
+            - all_A1: List of copies of Agent1 at each time step.
+            - all_A2: List of copies of Agent2 at each time step.
         """
         s = (Agent1.s0, Agent2.s0)
         stable1 = 0
@@ -281,81 +284,47 @@ class IRP(object):
         stable_state1 = 0
         all_visited_states = []
         all_actions = []
+        all_Q1 = []
+        all_Q2 = []
+        all_A1 = []
+        all_A2 = []
+
         for t in range(int(game.tmax)):
-            
-            # print(Agent2.Q[(0,2)])
-            # print(Agent2.Q[(3,2)])
-            # print(f"t = {t} ----------------------------------------------------------------------------------------")
             a1 = Agent1.pick_strategies(game, s, t)
             a2 = Agent2.pick_strategies(game, s[::-1], t)
             a = (a1, a2)
-            a_prof = np.array([a1,a2])
+            a_prof = np.array([a1, a2])
             all_actions.append(a)
-            # print(a)
+
             pi1 = self.compute_profits(a_prof)
-            # pi2 = self.compute_profits(a_prof[::-1])
             s1 = a
+
             same_state0 = (s[0] == s1[0])
-            stable_state0 = (stable_state0 + same_state0)*same_state0
+            stable_state0 = (stable_state0 + same_state0) * same_state0
 
             same_state1 = (s[1] == s1[1])
-            stable_state1 = (stable_state1 + same_state1)*same_state1
+            stable_state1 = (stable_state1 + same_state1) * same_state1
 
             _, stable1 = Agent1.update_function(game, s, a, pi1[0], stable1, t)
             _, stable2 = Agent2.update_function(game, s[::-1], a[::-1], pi1[1], stable2, t)
             s = s1
             all_visited_states.append(s1)
-            if game.check_convergence(game, t, stable1, stable2):
+
+            all_A1.append(copy.deepcopy(Agent1))
+            all_A2.append(copy.deepcopy(Agent2))
+
+            # Store Q-values if agents have Q-values
+            if hasattr(Agent1, 'Q'):
+                all_Q1.append(Agent1.Q.copy())
+            else:
+                all_Q1.append(None)
+
+            if hasattr(Agent2, 'Q'):
+                all_Q2.append(Agent2.Q.copy())
+            else:
+                all_Q2.append(None)
+
+            if game.check_end(game, t, stable1, stable2):
                 break
-        return game, s, all_visited_states, all_actions
-    
-    
-    # def simulate_game(self, Agent1, Agent2, game):
 
-    #     """
-    #     Simulate the game between two agents.
-
-    #     Parameters:
-    #     ----------
-    #     Agent1 : object
-    #         First agent with pick_strategies and update_function methods.
-    #     Agent2 : object
-    #         Second agent with pick_strategies and update_function methods.
-
-    #     Returns:
-    #     -------
-    #     tuple
-    #         A tuple containing the final state, all visited states, and all actions taken.
-    #     """
-    #     s = game.s0
-    #     stable1 = 0
-    #     stable2 = 0
-    #     stable_state0 = 0
-    #     stable_state1 = 0
-    #     all_visited_states = []
-    #     all_actions = []
-    #     for t in range(int(game.tmax)):
-    #        # print(f"t = {t} ----------------------------------------------------------------------------------------")
-    #         a1 = Agent1.pick_strategies(game, s, t)
-    #         a2 = Agent2.pick_strategies(game, s[::-1], t)
-    #         a = (a1, a2)
-    #         all_actions.append(a)
-    #         # print(a)
-    #         pi1 = game.PI[a]
-    #         pi2 = game.PI[a[::-1]]
-    #         s1 = a
-    #         same_state0 = (s[0] == s1[0])
-    #         stable_state0 = (stable_state0 + same_state0)*same_state0
-
-    #         same_state1 = (s[1] == s1[1])
-    #         stable_state1 = (stable_state1 + same_state1)*same_state1
-
-    #         _, stable1 = Agent1.update_function(game, s, a, s1, pi1[0], stable1, t)
-    #         _, stable2 = Agent2.update_function(game, s[::-1], a[::-1], s1[::-1], pi2[0], stable2, t)
-    #         s = s1
-    #         all_visited_states.append(s1)
-    #         if game.check_convergence(game, t, stable1, stable2):
-    #             break
-    #     return game, s, all_visited_states, all_actions
-
-    
+        return game, s, all_visited_states, all_actions, all_Q1, all_Q2, all_A1, all_A2
