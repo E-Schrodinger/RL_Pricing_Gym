@@ -5,6 +5,111 @@ from numba import njit, prange
 import copy  # Import the copy module for deep copying
 
 
+def check_end(game, t, stable1, stable2):
+        """
+        Check if the game has converged.
+
+        Parameters
+        ----------
+        game : IRP
+            The game environment.
+        t : int
+            Current iteration number.
+        stable1 : int
+            Number of stable periods for algorithm 1.
+        stable2 : int
+            Number of stable periods for algorithm 2.
+
+        Returns
+        -------
+        bool
+            True if the game has converged, False otherwise.
+        """
+        if (t % game.tstable == 0) & (t > 0):
+            sys.stdout.write("\rt=%i " % t)
+            sys.stdout.flush()
+        if stable1 > game.tstable and stable2 > game.tstable:
+            print('Both Algorithms Converged!')
+            return True
+        if t == game.tmax - 1:
+            if stable1 > game.tstable:
+                print("Algorithm 1 : Converged. Algorithm 2: Not Converged")
+                return True
+            elif stable2 > game.tstable:
+                print("Algorithm 1 : Not Converged. Algorithm 2: Converged")
+                return True
+
+            print('ERROR! Not Converged!')
+            return True
+        return False
+
+def simulate_game(Agent1, Agent2, game):
+    """
+    Simulate the game between two agents.
+
+    Parameters
+    ----------
+    Agent1 : object
+        First agent with pick_strategies and update_function methods.
+    Agent2 : object
+        Second agent with pick_strategies and update_function methods.
+    game : IRP
+        The game environment.
+
+    Returns
+    -------
+    tuple
+        A tuple containing:
+        - game: The game environment after simulation.
+        - s: Final state.
+        - all_visited_states: List of all visited states during the simulation.
+        - all_actions: List of all actions taken during the simulation.
+        - all_Q1: List of Agent1's Q-values at each time step.
+        - all_Q2: List of Agent2's Q-values at each time step.
+        - all_A1: List of copies of Agent1 at each time step.
+        - all_A2: List of copies of Agent2 at each time step.
+    """
+    s = (Agent1.s0, Agent2.s0)
+    stable1 = 0
+    stable2 = 0
+    stable_state0 = 0
+    stable_state1 = 0
+    all_visited_states = []
+    all_actions = []
+    all_A1 = []
+    all_A2 = []
+
+    for t in range(int(game.tmax)):
+        a1 = Agent1.pick_strategies(game, s, t)
+        a2 = Agent2.pick_strategies(game, s[::-1], t)
+        a = (a1, a2)
+        a_prof = np.array([a1, a2])
+        all_actions.append(a)
+
+        pi1 = game.compute_profits(a_prof)
+        s1 = a
+
+        same_state0 = (s[0] == s1[0])
+        stable_state0 = (stable_state0 + same_state0) * same_state0
+
+        same_state1 = (s[1] == s1[1])
+        stable_state1 = (stable_state1 + same_state1) * same_state1
+
+        _, stable1 = Agent1.update_function(game, s, a, pi1[0], stable1, t)
+        _, stable2 = Agent2.update_function(game, s[::-1], a[::-1], pi1[1], stable2, t)
+        s = s1
+        all_visited_states.append(s1)
+
+        all_A1.append(copy.deepcopy(Agent1))
+        all_A2.append(copy.deepcopy(Agent2))
+
+
+        if check_end(game, t, stable1, stable2):
+            break
+
+    return game, s, all_visited_states, all_actions, all_A1, all_A2
+
+
 class Simulations:
     """
     A class to perform and manage multiple simulations of a game environment involving two agents.
@@ -89,8 +194,6 @@ class Simulations:
         """
         if self.simulation_results is None:
             self.simulation_results = []
-            self.Q_vals_1 = []
-            self.Q_vals_2 = []
 
             self.agent1_is_q = self.has_q_vals(self.Agent1)
             self.agent2_is_q = self.has_q_vals(self.Agent2)
@@ -105,23 +208,10 @@ class Simulations:
                     s,
                     all_visited_states,
                     all_actions,
-                    all_Q1,
-                    all_Q2,
                     all_A1,
                     all_A2
-                ) = self.env.simulate_game(self.Agent1, self.Agent2, self.env)
+                ) = simulate_game(self.Agent1, self.Agent2, self.env)
                 self.simulation_results.append((all_visited_states, all_actions))
-
-                # Store Q-values if agents use Q-learning or SARSA
-                if self.agent1_is_q:
-                    self.Q_vals_1.append(all_Q1)
-                else:
-                    self.Q_vals_1.append(None)
-
-                if self.agent2_is_q:
-                    self.Q_vals_2.append(all_Q2)
-                else:
-                    self.Q_vals_2.append(None)
 
                 self.Agent1_list.append(all_A1)
                 self.Agent2_list.append(all_A2)
@@ -149,31 +239,37 @@ class Simulations:
 
         a1_list = []
         a2_list = []
-        Q1_list = []
-        Q2_list = []
         Agent1_list = []
         Agent2_list = []
 
-        for simulation_idx, (_, all_actions) in enumerate(self.simulation_results):
-            # Extract actions for each agent
-            a1_actions = [action[0] for action in all_actions]
-            a2_actions = [action[1] for action in all_actions]
-            a1_list.append(a1_actions)
-            a2_list.append(a2_actions)
+        if self.save_agents == False:
+            # Iterate through the simulation results and extract required information
+            for simulation_idx, (_, all_actions) in enumerate(self.simulation_results):
+                # Extract actions for each agent
+                a1_actions = [action[0] for action in all_actions]
+                a2_actions = [action[1] for action in all_actions]
+                a1_list.append(a1_actions)
+                a2_list.append(a2_actions)
 
-            Agent1_list.append(self.Agent1_list[simulation_idx])
-            Agent2_list.append(self.Agent2_list[simulation_idx])
 
-            # Retrieve Q-values if available
-            if self.agent1_is_q:
-                Q1_list.append(self.Q_vals_1[simulation_idx])
-            else:
-                Q1_list.append(None)
 
-            if self.agent2_is_q:
-                Q2_list.append(self.Q_vals_2[simulation_idx])
-            else:
-                Q2_list.append(None)
+            # Return the collected values
+            return a1_list, a2_list
 
-        # Return the action lists, Q-value lists, and agent lists
-        return a1_list, a2_list, Q1_list, Q2_list, Agent1_list, Agent2_list
+        else:
+
+            # Iterate through the simulation results and extract required information
+            for simulation_idx, (_, all_actions) in enumerate(self.simulation_results):
+                # Extract actions for each agent
+                a1_actions = [action[0] for action in all_actions]
+                a2_actions = [action[1] for action in all_actions]
+                a1_list.append(a1_actions)
+                a2_list.append(a2_actions)
+
+                # Collect agent instances after simulation
+                Agent1_list.append(self.Agent1_list[simulation_idx])
+                Agent2_list.append(self.Agent2_list[simulation_idx])
+
+
+            # Return the collected values
+            return a1_list, a2_list, Agent1_list, Agent2_list

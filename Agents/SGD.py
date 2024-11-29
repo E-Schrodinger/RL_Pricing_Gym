@@ -98,9 +98,11 @@ class SGD:
             self.action_dim = self.k  # Number of possible actions
         elif self.action_space_type == 'continuous':
             if self.action_low is None or self.action_high is None:
+
                 # Set default action bounds
-                self.action_low = 0.0
-                self.action_high = 1.0
+                n_price, mono_price = game.show_stats()
+                self.action_low = n_price[0]
+                self.action_high = mono_price[0]
             # For continuous actions, action_dim is 1
             self.action_dim = 1
         else:
@@ -398,7 +400,7 @@ class SGD:
         probs = exp_prefs / sum_exp_prefs if sum_exp_prefs > 0 else np.ones_like(preferences) / len(preferences)
         return probs
 
-    def update_function(self, game, p, a_prices, pi, stable, t, tol=1e-5):
+    def update_function(self, game, p, a_prices, pi, stable, t, tol=1e-2):
         """
         Update the policy parameters based on the observed transition and reward.
 

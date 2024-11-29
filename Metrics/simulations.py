@@ -4,6 +4,7 @@ import numpy as np
 import copy  # For deep copying agents and environment
 from joblib import Parallel, delayed
 import os
+from .Simulation_Base import simulate_game
 
 class Simulations:
     """
@@ -14,6 +15,7 @@ class Simulations:
 
     def __init__(self, game, Agent1, Agent2, **kwargs):
         self.iterations = kwargs.get('iterations', 100)
+        self.save_agents = kwargs.get('save_agents', False)
         self.simulation_results = []
         self.Q_vals_1 = []
         self.Q_vals_2 = []
@@ -67,18 +69,14 @@ class Simulations:
             s,
             all_visited_states,
             all_actions,
-            all_Q1,
-            all_Q2,
             all_A1,
             all_A2
-        ) = env_copy.simulate_game(agent1_copy, agent2_copy, env_copy)
+        ) = simulate_game(agent1_copy, agent2_copy, env_copy)
 
         # Prepare the result
         result = {
             'visited_states': all_visited_states,
             'actions': all_actions,
-            'Q1': all_Q1 if self.agent1_is_q else None,
-            'Q2': all_Q2 if self.agent2_is_q else None,
             'Agent1': all_A1,
             'Agent2': all_A2
         }
@@ -94,7 +92,7 @@ class Simulations:
         None
         """
         # Determine the number of jobs (processes) to run in parallel
-        num_jobs = min(self.iterations, os.cpu_count())
+        num_jobs = min(self.iterations, 8)
 
         # Use joblib's Parallel and delayed to execute simulations in parallel
         parallel = Parallel(n_jobs=num_jobs, prefer="threads")  # prefer="processes" can be used alternatively
@@ -105,12 +103,10 @@ class Simulations:
         # Aggregate the results
         for res in simulation_results:
             self.simulation_results.append((res['visited_states'], res['actions']))
-            self.Q_vals_1.append(res['Q1'])
-            self.Q_vals_2.append(res['Q2'])
             self.Agent1_list.append(res['Agent1'])
             self.Agent2_list.append(res['Agent2'])
 
-    def get_values_parallel(self):
+    def get_values(self):
         """
         Run simulations in parallel and retrieve the actions, Q-values, and agent states from all simulations.
 
@@ -131,33 +127,37 @@ class Simulations:
         # Initialize lists to collect values
         a1_list = []
         a2_list = []
-        Q1_list = []
-        Q2_list = []
         Agent1_list = []
         Agent2_list = []
 
-        # Iterate through the simulation results and extract required information
-        for simulation_idx, (_, all_actions) in enumerate(self.simulation_results):
-            # Extract actions for each agent
-            a1_actions = [action[0] for action in all_actions]
-            a2_actions = [action[1] for action in all_actions]
-            a1_list.append(a1_actions)
-            a2_list.append(a2_actions)
+        if self.save_agents == False:
+            # Iterate through the simulation results and extract required information
+            for simulation_idx, (_, all_actions) in enumerate(self.simulation_results):
+                # Extract actions for each agent
+                a1_actions = [action[0] for action in all_actions]
+                a2_actions = [action[1] for action in all_actions]
+                a1_list.append(a1_actions)
+                a2_list.append(a2_actions)
 
-            # Collect agent instances after simulation
-            Agent1_list.append(self.Agent1_list[simulation_idx])
-            Agent2_list.append(self.Agent2_list[simulation_idx])
 
-            # Collect Q-values if applicable
-            if self.agent1_is_q:
-                Q1_list.append(self.Q_vals_1[simulation_idx])
-            else:
-                Q1_list.append(None)
 
-            if self.agent2_is_q:
-                Q2_list.append(self.Q_vals_2[simulation_idx])
-            else:
-                Q2_list.append(None)
+            # Return the collected values
+            return a1_list, a2_list
 
-        # Return the collected values
-        return a1_list, a2_list, Q1_list, Q2_list, Agent1_list, Agent2_list
+        else:
+
+            # Iterate through the simulation results and extract required information
+            for simulation_idx, (_, all_actions) in enumerate(self.simulation_results):
+                # Extract actions for each agent
+                a1_actions = [action[0] for action in all_actions]
+                a2_actions = [action[1] for action in all_actions]
+                a1_list.append(a1_actions)
+                a2_list.append(a2_actions)
+
+                # Collect agent instances after simulation
+                Agent1_list.append(self.Agent1_list[simulation_idx])
+                Agent2_list.append(self.Agent2_list[simulation_idx])
+
+
+            # Return the collected values
+            return a1_list, a2_list, Agent1_list, Agent2_list

@@ -1,9 +1,4 @@
-"""
-Batch SARSA Functions
 
-This module implements Batch SARSA (State-Action-Reward-State-Action) algorithms 
-for reinforcement learning in game theory contexts.
-"""
 
 import sys
 import numpy as np

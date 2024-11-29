@@ -3,16 +3,16 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import copy
-from itertools import product
-from joblib import Parallel, delayed
 
 
 class Actor(nn.Module):
     """
     Actor Network for PPO Agent.
 
-    This network takes the current state as input and outputs 
-    a probability distribution over possible actions.
+    This network takes the current state as input and outputs either
+    a probability distribution over possible actions (discrete action space),
+    or the parameters (mean and standard deviation) of a Gaussian distribution
+    over continuous actions.
 
     Attributes
     ----------
@@ -21,12 +21,14 @@ class Actor(nn.Module):
     fc2 : nn.Linear
         Second fully connected layer.
     action_head : nn.Linear
-        Output layer that maps to action probabilities.
+        Output layer that maps to action probabilities or mean.
+    log_std : nn.Parameter
+        Learnable parameter for the standard deviation (continuous actions).
     softmax : nn.Softmax
-        Softmax activation to obtain probabilities.
+        Softmax activation to obtain probabilities (discrete actions).
     """
 
-    def __init__(self, state_dim, action_dim):
+    def __init__(self, state_dim, action_dim, action_space_type='discrete'):
         """
         Initialize the Actor network.
 
@@ -35,13 +37,24 @@ class Actor(nn.Module):
         state_dim : int
             Dimension of the input state.
         action_dim : int
-            Number of possible actions.
+            Number of possible actions (discrete) or dimension of action (continuous).
+        action_space_type : str
+            Type of action space: 'discrete' or 'continuous'.
         """
         super(Actor, self).__init__()
+        self.action_space_type = action_space_type
         self.fc1 = nn.Linear(state_dim, 64)
         self.fc2 = nn.Linear(64, 64)
-        self.action_head = nn.Linear(64, action_dim)
-        self.softmax = nn.Softmax(dim=-1)
+
+        if self.action_space_type == 'discrete':
+            self.action_head = nn.Linear(64, action_dim)
+            self.softmax = nn.Softmax(dim=-1)
+        elif self.action_space_type == 'continuous':
+            self.mean_head = nn.Linear(64, action_dim)
+            # Learnable parameter for log standard deviation
+            self.log_std = nn.Parameter(torch.zeros(action_dim))
+        else:
+            raise ValueError("action_space_type must be 'discrete' or 'continuous'")
 
     def forward(self, x):
         """
@@ -55,12 +68,17 @@ class Actor(nn.Module):
         Returns
         -------
         torch.Tensor
-            Action probabilities.
+            Action probabilities (discrete) or action mean and std (continuous).
         """
         x = torch.tanh(self.fc1(x))
         x = torch.tanh(self.fc2(x))
-        action_probs = self.softmax(self.action_head(x))
-        return action_probs
+        if self.action_space_type == 'discrete':
+            action_probs = self.softmax(self.action_head(x))
+            return action_probs
+        elif self.action_space_type == 'continuous':
+            mean = self.mean_head(x)
+            std = torch.exp(self.log_std)  # Exponentiate log_std to get std
+            return mean, std
 
 
 class Critic(nn.Module):
@@ -119,6 +137,7 @@ class PPO_Agent:
     Proximal Policy Optimization (PPO) Agent.
 
     This agent uses PPO to learn optimal pricing strategies within a game environment.
+    It supports both discrete and continuous action spaces.
 
     Attributes
     ----------
@@ -136,8 +155,10 @@ class PPO_Agent:
         Size of the experience buffer.
     batch_size : int
         Batch size for training.
+    action_space_type : str
+        Type of action space: 'discrete' or 'continuous'.
     a1_prices : np.ndarray or None
-        Array of possible prices for agent 1.
+        Array of possible prices for agent 1 (discrete actions).
     cal_k : int
         Number of price points in the action space.
     lump_tol : float
@@ -145,9 +166,13 @@ class PPO_Agent:
     space_type : str
         Type of action space to use.
     a1_space : np.ndarray
-        Discrete action space (possible prices).
+        Discrete action space (possible prices) for discrete actions.
+    action_low : float
+        Minimum action value for continuous action spaces.
+    action_high : float
+        Maximum action value for continuous action spaces.
     k : int
-        Number of possible actions.
+        Number of possible actions (discrete).
     price_state_space : np.ndarray
         Copy of the action space for state representation.
     state_dim : int
@@ -178,7 +203,7 @@ class PPO_Agent:
 
         Parameters
         ----------
-        game : IRP
+        game : object
             The game environment instance.
         **kwargs : dict
             Additional parameters to override default values.
@@ -192,21 +217,40 @@ class PPO_Agent:
         self.buffer_size = kwargs.get('buffer_size', 64)
         self.batch_size = kwargs.get('batch_size', 32)
 
-        # Initialize action space and state space
+        # Action space parameters
+        self.action_space_type = kwargs.get('action_space_type', 'discrete')  # 'discrete' or 'continuous'
         self.a1_prices = kwargs.get("a1_prices", None)
         self.cal_k = kwargs.get("cal_k", 15)
         self.lump_tol = kwargs.get("lump_tol", 0.05)
         self.space_type = kwargs.get("space_type", "default")
-        self.a1_space = self.make_action_space(game)
-        self.k = self.a1_space.shape[0]
-        self.price_state_space = copy.copy(self.a1_space)
 
-        # Define state and action dimensions
-        self.state_dim = 2  # State includes own and opponent's last prices
-        self.action_dim = self.k  # Number of possible actions
+        if self.action_space_type == 'discrete':
+            self.a1_space = self.make_action_space(game)
+            self.k = self.a1_space.shape[0]
+            self.price_state_space = copy.copy(self.a1_space)
+
+            # Define state and action dimensions
+            self.state_dim = 2  # State includes own and opponent's last prices
+            self.action_dim = self.k  # Number of possible actions
+
+        elif self.action_space_type == 'continuous':
+            self.action_low = kwargs.get('action_low', None)
+            self.action_high = kwargs.get('action_high', None)
+            if self.action_low is None or self.action_high is None:
+                # Set default action bounds
+                self.action_low = 0.0
+                self.action_high = 1.0
+            # For continuous actions, action_dim is 1
+            self.action_dim = 1
+            # Initialize action space
+            self.price_state_space = np.array([self.action_low, self.action_high])
+            # Define state dimensions
+            self.state_dim = 2  # State includes own and opponent's last prices
+        else:
+            raise ValueError("action_space_type must be 'discrete' or 'continuous'")
 
         # Initialize policy and value networks
-        self.policy_net = Actor(self.state_dim, self.action_dim)
+        self.policy_net = Actor(self.state_dim, self.action_dim, self.action_space_type)
         self.value_net = Critic(self.state_dim)
 
         # Initialize optimizers
@@ -231,7 +275,7 @@ class PPO_Agent:
 
         Parameters
         ----------
-        game : IRP
+        game : object
             The game environment instance.
 
         Returns
@@ -242,7 +286,7 @@ class PPO_Agent:
         if self.a1_prices is None:
             p_competitive, p_monopoly = game.compute_p_competitive_monopoly()
             a = np.linspace(min(p_competitive), max(p_monopoly), self.cal_k - 2)
-            delta = a[1] - a[0]
+            delta = a[1] - a[0] if len(a) > 1 else 0.1
             self.a1_prices = np.linspace(min(a) - delta, max(a) + delta, self.cal_k)
         else:
             self.a1_prices = np.array(self.a1_prices)
@@ -259,7 +303,12 @@ class PPO_Agent:
         float
             Initial price.
         """
-        initial_price = self.a1_space[0]
+        if self.action_space_type == 'discrete':
+            initial_price = self.a1_space[0]
+        elif self.action_space_type == 'continuous':
+            initial_price = (self.action_high + self.action_low) / 2.0
+        else:
+            raise ValueError("action_space_type must be 'discrete' or 'continuous'")
         return initial_price
 
     def reset(self, game):
@@ -268,7 +317,7 @@ class PPO_Agent:
 
         Parameters
         ----------
-        game : IRP
+        game : object
             The game environment instance.
         """
         # Reset buffer and any other variables
@@ -284,7 +333,7 @@ class PPO_Agent:
 
         Parameters
         ----------
-        game : IRP
+        game : object
             The game environment instance.
         p : tuple
             Tuple containing the last prices of both agents.
@@ -300,21 +349,51 @@ class PPO_Agent:
         s = np.array([p[0], p[1]], dtype=np.float32)
         s_tensor = torch.tensor(s, dtype=torch.float32)
 
-        # Get action probabilities from policy network
-        with torch.no_grad():
-            action_probs = self.policy_net(s_tensor)
-        m = torch.distributions.Categorical(action_probs)
-        a = m.sample()
-        a_price = self.a1_space[a.item()]
+        if self.action_space_type == 'discrete':
+            # Get action probabilities from policy network
+            with torch.no_grad():
+                action_probs = self.policy_net(s_tensor)
+            m = torch.distributions.Categorical(action_probs)
+            a = m.sample()
+            a_price = self.a1_space[a.item()]
+            log_prob = m.log_prob(a)
+            # Store data in buffer
+            self.buffer.append({
+                'state': s,
+                'action': a.item(),
+                'log_prob': log_prob.item(),
+                'reward': None,          # To be filled in update_function
+                'next_state': None       # To be filled in update_function
+            })
 
-        # Store data in buffer
-        self.buffer.append({
-            'state': s,
-            'action': a.item(),
-            'log_prob': m.log_prob(a).item(),
-            'reward': None,          # To be filled in update_function
-            'next_state': None       # To be filled in update_function
-        })
+        elif self.action_space_type == 'continuous':
+            # Get mean and std from policy network
+            with torch.no_grad():
+                mean, std = self.policy_net(s_tensor)
+            mean = mean.squeeze()
+            std = std.squeeze()
+            # Create normal distribution
+            m = torch.distributions.Normal(mean, std)
+            # Sample action
+            a = m.sample()
+            # Apply tanh to bound the actions between -1 and 1
+            a_tanh = torch.tanh(a)
+            # Scale to action_low and action_high
+            a_price = a_tanh.item() * (self.action_high - self.action_low) / 2 + (self.action_high + self.action_low) / 2
+            # Compute log probability (adjusted for Tanh transformation)
+            log_prob = m.log_prob(a) - torch.log(1 - a_tanh.pow(2) + 1e-6)
+            log_prob = log_prob.sum()
+
+            # Store data in buffer
+            self.buffer.append({
+                'state': s,
+                'action': a.item(),
+                'log_prob': log_prob.item(),
+                'reward': None,          # To be filled in update_function
+                'next_state': None       # To be filled in update_function
+            })
+        else:
+            raise ValueError("action_space_type must be 'discrete' or 'continuous'")
 
         self.a_price = a_price
         return a_price
@@ -325,7 +404,7 @@ class PPO_Agent:
 
         Parameters
         ----------
-        game : IRP
+        game : object
             The game environment instance.
         p : tuple
             Current prices of both agents.
@@ -380,7 +459,7 @@ class PPO_Agent:
 
         # Convert buffer to tensors
         states = torch.from_numpy(np.array([item['state'] for item in self.buffer], dtype=np.float32))
-        actions = torch.tensor([item['action'] for item in self.buffer], dtype=torch.long)
+        actions = torch.tensor([item['action'] for item in self.buffer], dtype=torch.float32 if self.action_space_type == 'continuous' else torch.long)
         rewards = [item['reward'] for item in self.buffer]
         next_states = torch.from_numpy(np.array([item['next_state'] for item in self.buffer], dtype=np.float32))
         old_log_probs = torch.tensor([item['log_prob'] for item in self.buffer], dtype=torch.float32)
@@ -402,20 +481,46 @@ class PPO_Agent:
 
         # Optimize policy for K epochs
         for _ in range(self.K_epochs):
-            # Get action probabilities
-            action_probs = self.policy_net(states)
-            m = torch.distributions.Categorical(action_probs)
-            log_probs = m.log_prob(actions)
+            if self.action_space_type == 'discrete':
+                # Get action probabilities
+                action_probs = self.policy_net(states)
+                m = torch.distributions.Categorical(action_probs)
+                log_probs = m.log_prob(actions)
 
-            # Compute ratio
-            ratios = torch.exp(log_probs - old_log_probs)
+                # Compute ratio
+                ratios = torch.exp(log_probs - old_log_probs)
 
-            # Compute surrogate loss
-            surr1 = ratios * advantages
-            surr2 = torch.clamp(ratios, 1 - self.epsilon_clip, 1 + self.epsilon_clip) * advantages
+                # Compute surrogate loss
+                surr1 = ratios * advantages
+                surr2 = torch.clamp(ratios, 1 - self.epsilon_clip, 1 + self.epsilon_clip) * advantages
 
-            # Compute actor loss
-            actor_loss = -torch.min(surr1, surr2).mean()
+                # Compute actor loss
+                actor_loss = -torch.min(surr1, surr2).mean()
+
+            elif self.action_space_type == 'continuous':
+                # Get mean and std from policy network
+                mean, std = self.policy_net(states)
+                # Create normal distribution
+                m = torch.distributions.Normal(mean, std)
+                # Compute log probabilities
+                log_probs = m.log_prob(actions.unsqueeze(-1))
+                log_probs = log_probs.sum(dim=-1)
+                # Adjust log probabilities for Tanh squashing
+                action_tanh = torch.tanh(actions)
+                log_probs -= torch.log(1 - action_tanh.pow(2) + 1e-6)
+                log_probs = log_probs.sum(dim=-1)
+
+                # Compute ratio
+                ratios = torch.exp(log_probs - old_log_probs)
+
+                # Compute surrogate loss
+                surr1 = ratios * advantages
+                surr2 = torch.clamp(ratios, 1 - self.epsilon_clip, 1 + self.epsilon_clip) * advantages
+
+                # Compute actor loss
+                actor_loss = -torch.min(surr1, surr2).mean()
+            else:
+                raise ValueError("action_space_type must be 'discrete' or 'continuous'")
 
             # Compute critic loss
             values = self.value_net(states).squeeze()

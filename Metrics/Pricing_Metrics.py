@@ -9,7 +9,7 @@ from Environments.IRP import IRP
 import seaborn as sns
 
 
-def average_price(game, Agent1, Agent2, a1_list, a2_list):
+def average_price(game, a1_list, a2_list):
     """
     Calculate the average price set by each agent over all simulations.
 
@@ -55,6 +55,104 @@ def average_price(game, Agent1, Agent2, a1_list, a2_list):
 
     return avg_price1, avg_price2
 
+
+
+def average_price_and_profit(game, a1_list, a2_list):
+    """
+    Calculate the average and standard deviation of prices set by each agent,
+    as well as the average profit and standard deviation of profits for each agent
+    over all simulations during the stable period.
+
+    Parameters
+    ----------
+    game : object
+        The game environment containing simulation parameters such as `tstable`.
+    a1_list : list of lists
+        A list where each sublist contains the actions (prices) taken by Agent1 in a simulation.
+    a2_list : list of lists
+        A list where each sublist contains the actions (prices) taken by Agent2 in a simulation.
+
+    Returns
+    -------
+    dict
+        A dictionary containing:
+            - 'avg_price1': Average price set by Agent1.
+            - 'std_price1': Standard deviation of prices set by Agent1.
+            - 'avg_price2': Average price set by Agent2.
+            - 'std_price2': Standard deviation of prices set by Agent2.
+            - 'avg_profit1': Average profit for Agent1.
+            - 'std_profit1': Standard deviation of profits for Agent1.
+            - 'avg_profit2': Average profit for Agent2.
+            - 'std_profit2': Standard deviation of profits for Agent2.
+    """
+    
+    iterations = len(a1_list)
+
+    # Lists to store per-simulation statistics
+    list_avg_p1 = []
+    list_avg_p2 = []
+    list_std_p1 = []
+    list_std_p2 = []
+    list_pi1 = []
+    list_pi2 = []
+    
+    for i in range(iterations):
+        # Extract the last tstable actions for each agent
+        stable_actions_a1 = a1_list[i][-int(game.tstable):]
+        stable_actions_a2 = a2_list[i][-int(game.tstable):]
+        
+        # Calculate average prices for the stable period
+        avg_p1 = np.mean(stable_actions_a1)
+        avg_p2 = np.mean(stable_actions_a2)
+        
+        # Calculate standard deviation of prices for the stable period
+        std_p1 = np.std(stable_actions_a1)
+        std_p2 = np.std(stable_actions_a2)
+        
+        # Compute profits based on average prices
+        p = np.array([avg_p1, avg_p2])
+        pi = game.compute_profits(p)  # Expected to return [pi1, pi2]
+        
+        # Append the results to the lists
+        list_avg_p1.append(avg_p1)
+        list_avg_p2.append(avg_p2)
+        list_std_p1.append(std_p1)
+        list_std_p2.append(std_p2)
+        list_pi1.append(pi[0])
+        list_pi2.append(pi[1])
+
+    # Calculate overall statistics for prices
+    overall_avg_p1 = np.mean(list_avg_p1)
+    overall_std_p1 = np.std(list_avg_p1)
+    overall_avg_p2 = np.mean(list_avg_p2)
+    overall_std_p2 = np.std(list_avg_p2)
+    
+    # Calculate overall statistics for profits
+    overall_avg_pi1 = np.mean(list_pi1)
+    overall_std_pi1 = np.std(list_pi1)
+    overall_avg_pi2 = np.mean(list_pi2)
+    overall_std_pi2 = np.std(list_pi2)
+    
+    # Print the results
+    print(f"Price Statistics over {iterations} iterations:")
+    print(f"Agent 1 - Average Price: {overall_avg_p1:.4f}, Standard Deviation: {overall_std_p1:.4f}")
+    print(f"Agent 2 - Average Price: {overall_avg_p2:.4f}, Standard Deviation: {overall_std_p2:.4f}\n")
+    
+    print(f"Profit Statistics over {iterations} iterations:")
+    print(f"Agent 1 - Average Profit: {overall_avg_pi1:.4f}, Standard Deviation: {overall_std_pi1:.4f}")
+    print(f"Agent 2 - Average Profit: {overall_avg_pi2:.4f}, Standard Deviation: {overall_std_pi2:.4f}")
+    
+    # Return the statistics as a dictionary
+    return {
+        'avg_price1': overall_avg_p1,
+        'std_price1': overall_std_p1,
+        'avg_price2': overall_avg_p2,
+        'std_price2': overall_std_p2,
+        'avg_profit1': overall_avg_pi1,
+        'std_profit1': overall_std_pi1,
+        'avg_profit2': overall_avg_pi2,
+        'std_profit2': overall_std_pi2
+    }
 
 def create_directed_network_graph(adj_matrix, node_labels):
     """
@@ -281,7 +379,7 @@ def check_rp(adj_matrix):
         return 0
 
 
-def plot_rp(Agent1_list, Agent2_list, Q1_list, Q2_list, time_step=1):
+def plot_rp(Agent1_list, Agent2_list, time_step=1):
     """
     Process Q-values from two agents, compute the averaged check_rp values per time step, and plot the results.
 
@@ -307,11 +405,11 @@ def plot_rp(Agent1_list, Agent2_list, Q1_list, Q2_list, time_step=1):
     list
         A list of averaged `check_rp` values per specified time step.
     """
-    num_trajectories = len(Q1_list)
-    assert num_trajectories == len(Q2_list), "Q1_list and Q2_list must have the same number of trajectories."
+    num_trajectories = len(Agent1_list)
+    assert num_trajectories == len(Agent2_list), "Q1_list and Q2_list must have the same number of trajectories."
 
     # Get lengths of all trajectories to find the maximum length
-    lengths = [len(traj) for traj in Q1_list]
+    lengths = [len(traj) for traj in Agent1_list]
     max_length = max(lengths)
 
     # Initialize list to store check_rp values per time step
@@ -329,13 +427,13 @@ def plot_rp(Agent1_list, Agent2_list, Q1_list, Q2_list, time_step=1):
             if t < traj_length:
                 Agent1 = Agent1_list[x][t]
                 Agent2 = Agent2_list[x][t]
-                Q1 = Q1_list[x][t]
-                Q2 = Q2_list[x][t]
+                Q1 = Agent1.Q
+                Q2 = Agent2.Q
             else:
                 Agent1 = Agent1_list[x][-1]
                 Agent2 = Agent2_list[x][-1]
-                Q1 = Q1_list[x][-1]
-                Q2 = Q2_list[x][-1]
+                Q1 = Agent1.Q
+                Q2 = Agent2.Q
 
             # Compute the adjacency matrix using the predefined function
             adj_matrix = make_adjacency(Agent1, Agent2, Q1, Q2)
@@ -355,6 +453,7 @@ def plot_rp(Agent1_list, Agent2_list, Q1_list, Q2_list, time_step=1):
     plt.plot([t for t in time_steps], check_rp_values_per_time_step, marker='o')
     plt.xlabel('Time Step')
     plt.ylabel('Average check_rp Value')
+    plt.ylim((0,1))
     plt.title('Average check_rp Value over Time')
     plt.grid(True)
     plt.show()
@@ -362,7 +461,7 @@ def plot_rp(Agent1_list, Agent2_list, Q1_list, Q2_list, time_step=1):
     return check_rp_values_per_time_step
 
 
-def profit_graph(game, Agent1, Agent2, a1_lists, a2_lists):
+def profit_graph(game, a1_lists, a2_lists):
     """
     Plot the average profit over time for both players with confidence intervals.
 
