@@ -9,7 +9,7 @@ from Environments.IRP import IRP
 import seaborn as sns
 
 
-def average_price(game, a1_list, a2_list):
+def average_price(game, a1_list, a2_list, ts):
     """
     Calculate the average price set by each agent over all simulations.
 
@@ -43,8 +43,8 @@ def average_price(game, a1_list, a2_list):
     single_iter_average2 = 0
     for i in range(iterations):
         # Calculate average price for the stable period in each simulation
-        single_iter_average1 += np.sum([a for a in a1_list[i][-int(game.tstable):]]) / int(game.tstable)
-        single_iter_average2 += np.sum([a for a in a2_list[i][-int(game.tstable):]]) / int(game.tstable)
+        single_iter_average1 += np.sum([a for a in a1_list[i][-int(game.tstable/ts):]]) / int(game.tstable/ts)
+        single_iter_average2 += np.sum([a for a in a2_list[i][-int(game.tstable/ts):]]) / int(game.tstable/ts)
     
     # Calculate overall average prices
     avg_price1 = single_iter_average1 / iterations
@@ -57,7 +57,7 @@ def average_price(game, a1_list, a2_list):
 
 
 
-def average_price_and_profit(game, a1_list, a2_list):
+def average_price_and_profit(game, a1_list, a2_list,ts):
     """
     Calculate the average and standard deviation of prices set by each agent,
     as well as the average profit and standard deviation of profits for each agent
@@ -98,8 +98,8 @@ def average_price_and_profit(game, a1_list, a2_list):
     
     for i in range(iterations):
         # Extract the last tstable actions for each agent
-        stable_actions_a1 = a1_list[i][-int(game.tstable):]
-        stable_actions_a2 = a2_list[i][-int(game.tstable):]
+        stable_actions_a1 = a1_list[i][-int(game.tstable/ts):]
+        stable_actions_a2 = a2_list[i][-int(game.tstable/ts):]
         
         # Calculate average prices for the stable period
         avg_p1 = np.mean(stable_actions_a1)
@@ -667,7 +667,7 @@ def simulate_deviation(game, Agent1, Agent2, tdeviate, tmax, deviated_price=0, d
     plt.show()
 
 
-def state_heatmap(game, Agent1, Agent2, a1_list, a2_list):
+def state_heatmap(game, Agent1, Agent2, a1_list, a2_list, ts):
     """
     Generate a heatmap of joint state distributions.
 
@@ -705,7 +705,7 @@ def state_heatmap(game, Agent1, Agent2, a1_list, a2_list):
         a2_actions = a2_list[sim_idx]
         sim_length = len(a1_actions)
         # Determine the starting index for the stable period
-        start_idx = max(0, sim_length - int(game.tstable))
+        start_idx = max(0, sim_length - int(game.tstable/ts))
         for step_idx in range(start_idx, sim_length):
             a1_action = a1_actions[step_idx]
             a2_action = a2_actions[step_idx]

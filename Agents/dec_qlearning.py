@@ -92,9 +92,9 @@ class Dec_Q(QBase):
         """
         s = (self.get_index_1(p[0]), self.get_index_2(p[1]))
         a = np.zeros(1)
-        # Calculate exploration probability with exponential decay
-        pr_explore = np.exp(- t * self.beta)
-        # pr_explore = 0.1  # Alternatively, use a fixed exploration rate
+        # Calculate exploration probability
+        # pr_explore = np.exp(- t * self.beta)
+        pr_explore = 0.05 
         
         # Determine whether to explore or exploit for each player
         e = (pr_explore > np.random.rand())

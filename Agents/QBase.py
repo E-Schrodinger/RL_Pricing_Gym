@@ -76,6 +76,7 @@ class QBase:
         self.Q = self.make_Q()
         self.Q_val = self.Q.copy()
         self.num = self.make_num()
+        self.t = 0
 
     def make_action_space(self, game):
         """
@@ -177,7 +178,9 @@ class QBase:
         ------
         ValueError
             If space_type is not recognized.
-        """
+        # """
+        # if self.t == 0:
+        #     print(self.space_type)
         if self.space_type == 'default':
             return self.find_closest_index(p2)
         elif self.space_type == 'augment':
@@ -215,11 +218,16 @@ class QBase:
         -------
         int
             Index of the new or existing price in the state space.
-        """
+        # """
+        # if self.t == 0:
+        #     print(any(abs(x - p2) <= self.lump_tol for x in self.state_space))
         if any(abs(x - p2) <= self.lump_tol for x in self.state_space):
+            
             return self.find_closest_index(p2)
         else:
             self.state_space = np.append(self.state_space, p2)
+            # if self.t == 0:
+            #     print(self.state_space.shape)
             self.Q, self.Q_val = self.augment_Q()
             self.num = self.augment_num()
             return self.state_space.shape[0] - 1

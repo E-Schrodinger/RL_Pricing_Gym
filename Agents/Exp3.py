@@ -89,7 +89,7 @@ class Exp3(QBase):
             Chosen actions for each player.
         """
         # Compute the current exploration probability with exponential decay
-        gamma_t = np.exp(-self.beta * t)
+        gamma_t = 0.1
 
         # Update probabilities based on current weights and decaying gamma
         self.probabilities = (1 - gamma_t) * (self.weights / np.sum(self.weights)) + (gamma_t / self.k)
@@ -146,7 +146,7 @@ class Exp3(QBase):
 
         # Check for stability (weights have converged)
         if t > 1:
-            change = np.linalg.norm(self.weights - self.previous_weights, ord=1)
+            change = np.allclose(self.previous_weights, self.weights, atol=tol)
             if change < tol:
                 stable += 1
             else:

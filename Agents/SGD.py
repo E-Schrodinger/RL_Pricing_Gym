@@ -100,9 +100,8 @@ class SGD:
             if self.action_low is None or self.action_high is None:
 
                 # Set default action bounds
-                n_price, mono_price = game.show_stats()
-                self.action_low = n_price[0]
-                self.action_high = mono_price[0]
+                self.action_low = 1
+                self.action_high = 2
             # For continuous actions, action_dim is 1
             self.action_dim = 1
         else:

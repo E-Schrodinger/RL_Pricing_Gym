@@ -98,7 +98,7 @@ class Q_Learning(QBase):
         self.a_price = self.a1_space[a]
         return self.a_price
     
-    def update_function(self, game, p, a_prices, pi, stable, t, tol=1e-3):
+    def update_function(self, game, p, a_prices, pi, stable, t, tol=1e-5):
         """
         Update the Q-function based on the observed transition and reward.
 

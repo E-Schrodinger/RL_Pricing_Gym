@@ -40,7 +40,7 @@ def find_regret(game, Agent1, Agent2, a1_lists, a2_lists, use_loglog=False, regr
         a2_space = len(Agent2.a1_prices)
 
         total_rewards = np.array([
-            sum(game.compute_profits(np.array([i, a2_list[j]]))[0] for j in range(len(a2_list)))
+            sum(game.compute_profits(np.array([Agent1.a1_prices[i], a2_list[j]]))[0] for j in range(len(a2_list)))
             for i in range(a1_space)
         ])
 
@@ -48,7 +48,7 @@ def find_regret(game, Agent1, Agent2, a1_lists, a2_lists, use_loglog=False, regr
 
         # Calculate cumulative sums
         best_rewards = np.cumsum([
-            game.compute_profits(np.array([best_strategy, a2_list[j]]))[0]
+            game.compute_profits(np.array([Agent1.a1_prices[best_strategy], a2_list[j]]))[0]
             for j in range(current_length)
         ])
 
@@ -62,8 +62,8 @@ def find_regret(game, Agent1, Agent2, a1_lists, a2_lists, use_loglog=False, regr
             regret_over_time = best_rewards - actual_rewards
         else:
             # To avoid division by zero, replace zero best_rewards with np.nan
-            safe_best_rewards = np.where(best_rewards == 0, np.nan, best_rewards)
-            regret_over_time = 1 - (actual_rewards / safe_best_rewards)
+            # best_rewards = np.where(best_rewards == 0, np.nan, best_rewards)
+            regret_over_time = 1 - (actual_rewards / best_rewards)
 
         regret_over_time = regret_over_time.tolist()
         all_regrets.append(regret_over_time)
