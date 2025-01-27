@@ -105,6 +105,8 @@ def simulate_game(Agent1, Agent2, game, ts=1):
             
 
         if check_end(game, t, stable1, stable2):
+            Agent1.final_price = a[0]
+            Agent2.final_price = a[1]
             break
 
     

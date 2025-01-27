@@ -205,10 +205,3 @@ class IRP(object):
             PI[s] = game.compute_profits(p)
         return PI
 
-    def show_stats(self):
-        """
-        Display competitive and monopoly prices.
-        """
-        p_competitive, p_monopoly = self.compute_p_competitive_monopoly()
-        return  p_competitive, p_monopoly
-

@@ -8,7 +8,7 @@ from Agents.SGD import SGD
 
 from Metrics.simulations import Simulations
 # from Metrics.Simulation_Base import Simulations
-from Metrics.Pricing_Metrics import average_price, profit_graph, simulate_deviation, make_adjacency, state_heatmap, plot_rp, average_price_and_profit
+from Metrics.Pricing_Metrics import average_price, profit_graph, make_adjacency, state_heatmap, plot_rp, average_price_and_profit
 from Metrics.Regret_Metric import find_regret
 
 import numpy as np
@@ -19,6 +19,10 @@ import time
 game = IRP(tmax=1000000, tstable=100000)
 print(f'Max val = {game.tmax}')
 
+# p1,p2 = game.compute_p_competitive_monopoly()
+# print(p1)
+# print(p2)
+
 d_action_space = [1.0, 1.125,  1.25, 1.375, 1.5, 1.625, 1.75, 1.875, 2]
 
 time_step = 1000
@@ -27,6 +31,8 @@ time_step = 1000
 Agent1 = Q_Learning(game, beta=0.0001, Qinit='uniform', cal_k=8, a1_prices = d_action_space)
 Agent2 = Q_Learning(game, beta=0.0001, Qinit='uniform', cal_k=8, a1_prices = d_action_space)
 
+# print(game.compute_profits(np.array([1.473,1.473])))
+# print(game.compute_profits(np.array([1.925,1.925])))
 
 # Other agent initializations (if needed)
 # Agent1_Q = Dec_Q(game, beta=0.00001, Qinit='uniform', cal_k=8, a1_prices = d_action_space, batch_size = 100)
@@ -39,7 +45,7 @@ start_time = time.time()
 
 # Initialize the Simulations class with the desired number of iterations
 SIMULATION_ITERATIONS = 48  # Example: 100 iterations
-SM = Simulations(game, Agent1, Agent2, iterations=SIMULATION_ITERATIONS, ts = time_step)
+SM = Simulations(game, Agent1, Agent2_exp, iterations=SIMULATION_ITERATIONS, ts = time_step, save_agents = False)
 
 print(Agent1.a1_prices)
 # print(Agent2_SGD.action_high)
@@ -54,10 +60,17 @@ print(f"Final state_space = {Agent1.state_space.shape}")
 
 stats = average_price_and_profit(game, a1_list, a2_list, ts = time_step)
 
+# state_heatmap(game, Agent1, Agent2, a1_list, a2_list, time_step)
+
+# simulate_deviation(game, Agent1, Agent2, 1, 10, deviated_index=0, index=True)
+
+# make_adjacency(Agent1, Agent2, Agent1.Q, Agent2.Q, labels='index', plot_graph=True)
+
+# plot_rp(Agent1_list, Agent2_list, time_step=1)
 
 
 regret1 = find_regret(game, Agent1, Agent2_exp, a1_list, a2_list, use_loglog=False, regret_type="ratio")
-regret1 = find_regret(game, Agent2_exp, Agent1, a2_list, a1_list, use_loglog=False, regret_type="ratio")
+regret2 = find_regret(game, Agent2_exp, Agent1, a2_list, a1_list, use_loglog=False, regret_type="ratio")
 
 
 

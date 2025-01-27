@@ -47,12 +47,14 @@ class Exp3(QBase):
         """
         self.beta = kwargs.get('beta', 4e-6)    # Decay rate for exploration
         self.eta = kwargs.get('eta', 0.15)      # Learning rate
+        self.gamma = kwargs.get('gamma', 0.05)
 
         super().__init__(game, **kwargs)
 
         # Initialize weights uniformly
         self.weights = np.ones(self.k)
         self.probabilities = self.weights / np.sum(self.weights)
+        
 
     def reset(self, game):
         """
@@ -89,7 +91,7 @@ class Exp3(QBase):
             Chosen actions for each player.
         """
         # Compute the current exploration probability with exponential decay
-        gamma_t = 0.1
+        gamma_t = self.gamma
 
         # Update probabilities based on current weights and decaying gamma
         self.probabilities = (1 - gamma_t) * (self.weights / np.sum(self.weights)) + (gamma_t / self.k)
@@ -100,7 +102,7 @@ class Exp3(QBase):
         self.a_price = self.a1_space[action]
         return self.a_price
 
-    def update_function(self, game, p, a_prices, pi, stable, t, tol=1e-5):
+    def update_function(self, game, p, a_prices, pi, stable, t, tol=1e-3):
         """
         Update the weights based on the observed reward.
 

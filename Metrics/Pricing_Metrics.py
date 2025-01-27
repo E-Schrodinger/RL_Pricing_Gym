@@ -50,28 +50,41 @@ def average_price(game, a1_list, a2_list, ts):
     avg_price1 = single_iter_average1 / iterations
     avg_price2 = single_iter_average2 / iterations
 
-    print(f"Average price set by Agent 1 over {iterations} iterations = {avg_price1}")
-    print(f"Average price set by Agent 2 over {iterations} iterations = {avg_price2}")
+    print(f"Average price set by Agent 1 over {iterations} trajecotories = {avg_price1}")
+    print(f"Average price set by Agent 2 over {iterations} trajecotories = {avg_price2}")
 
     return avg_price1, avg_price2
 
 
 
-def average_price_and_profit(game, a1_list, a2_list,ts):
+
+def average_price_and_profit(game, a1_list, a2_list, ts):
     """
     Calculate the average and standard deviation of prices set by each agent,
     as well as the average profit and standard deviation of profits for each agent
-    over all simulations during the stable period.
-
+    over all simulations during the stable period. Additionally, compute the
+    average and standard deviation of Delta values for each agent, where Delta is defined as:
+    
+        Δ_i ≡ ( \bar{π}_i - π_i^N ) / ( π_i^M - π_i^N )
+    
+    for Agent i (i = 1, 2),
+    
+    where:
+    - \(\bar{\pi}_i\) is the average profit of Agent i upon convergence.
+    - \(\pi_i^N\) is the profit of Agent i in the Bertrand-Nash static equilibrium.
+    - \(\pi_i^M\) is the profit of Agent i under full collusion (monopoly).
+    
     Parameters
     ----------
     game : object
-        The game environment containing simulation parameters such as `tstable`.
+        The game environment containing simulation parameters and necessary methods such as `compute_p_competitive_monopol` and `compute_profits`.
     a1_list : list of lists
         A list where each sublist contains the actions (prices) taken by Agent1 in a simulation.
     a2_list : list of lists
         A list where each sublist contains the actions (prices) taken by Agent2 in a simulation.
-
+    ts : float
+        Time step or scaling factor used to compute the number of stable actions.
+    
     Returns
     -------
     dict
@@ -84,9 +97,33 @@ def average_price_and_profit(game, a1_list, a2_list,ts):
             - 'std_profit1': Standard deviation of profits for Agent1.
             - 'avg_profit2': Average profit for Agent2.
             - 'std_profit2': Standard deviation of profits for Agent2.
+            - 'avg_delta1': Average Delta value for Agent1.
+            - 'std_delta1': Standard deviation of Delta values for Agent1.
+            - 'avg_delta2': Average Delta value for Agent2.
+            - 'std_delta2': Standard deviation of Delta values for Agent2.
     """
     
     iterations = len(a1_list)
+
+    if iterations == 0:
+        raise ValueError("The action lists are empty. Please provide valid simulation data.")
+
+    # Compute Nash equilibrium prices and monopoly prices
+    p_competitive, p_monopoly = game.compute_p_competitive_monopoly()
+
+    # Compute profits for Nash equilibrium and monopoly
+    pi_N = game.compute_profits(p_competitive)  # [pi1_N, pi2_N]
+    pi_M = game.compute_profits(p_monopoly)     # [pi1_M, pi2_M]
+    
+    # Extract individual Nash and Monopoly profits
+    pi1_N, pi2_N = pi_N
+    pi1_M, pi2_M = pi_M
+
+    # Check to prevent division by zero in Delta calculation for each agent
+    if np.isclose(pi1_M, pi1_N):
+        raise ValueError("Monopoly profit and Nash equilibrium profit for Agent 1 are too close, causing division by zero in Delta calculation.")
+    if np.isclose(pi2_M, pi2_N):
+        raise ValueError("Monopoly profit and Nash equilibrium profit for Agent 2 are too close, causing division by zero in Delta calculation.")
 
     # Lists to store per-simulation statistics
     list_avg_p1 = []
@@ -95,11 +132,17 @@ def average_price_and_profit(game, a1_list, a2_list,ts):
     list_std_p2 = []
     list_pi1 = []
     list_pi2 = []
+    list_delta1 = []
+    list_delta2 = []
     
     for i in range(iterations):
         # Extract the last tstable actions for each agent
-        stable_actions_a1 = a1_list[i][-int(game.tstable/ts):]
-        stable_actions_a2 = a2_list[i][-int(game.tstable/ts):]
+        num_stable_actions = max(int(game.tstable / ts), 1)  # Ensure at least one action is taken
+        stable_actions_a1 = a1_list[i][-num_stable_actions:]
+        stable_actions_a2 = a2_list[i][-num_stable_actions:]
+        
+        if len(stable_actions_a1) == 0 or len(stable_actions_a2) == 0:
+            raise ValueError(f"Simulation {i} does not have enough stable actions. Ensure tstable and ts are set correctly.")
         
         # Calculate average prices for the stable period
         avg_p1 = np.mean(stable_actions_a1)
@@ -113,13 +156,24 @@ def average_price_and_profit(game, a1_list, a2_list,ts):
         p = np.array([avg_p1, avg_p2])
         pi = game.compute_profits(p)  # Expected to return [pi1, pi2]
         
+        if len(pi) != 2:
+            raise ValueError(f"compute_profits should return a list or array of two elements, got {len(pi)} elements.")
+        
+        pi1, pi2 = pi
+        
+        # Compute Delta for each agent
+        delta1 = (pi1 - pi1_N) / (pi1_M - pi1_N)
+        delta2 = (pi2 - pi2_N) / (pi2_M - pi2_N)
+        
         # Append the results to the lists
         list_avg_p1.append(avg_p1)
         list_avg_p2.append(avg_p2)
         list_std_p1.append(std_p1)
         list_std_p2.append(std_p2)
-        list_pi1.append(pi[0])
-        list_pi2.append(pi[1])
+        list_pi1.append(pi1)
+        list_pi2.append(pi2)
+        list_delta1.append(delta1)
+        list_delta2.append(delta2)
 
     # Calculate overall statistics for prices
     overall_avg_p1 = np.mean(list_avg_p1)
@@ -133,14 +187,24 @@ def average_price_and_profit(game, a1_list, a2_list,ts):
     overall_avg_pi2 = np.mean(list_pi2)
     overall_std_pi2 = np.std(list_pi2)
     
+    # Calculate overall statistics for Delta
+    overall_avg_delta1 = np.mean(list_delta1)
+    overall_std_delta1 = np.std(list_delta1)
+    overall_avg_delta2 = np.mean(list_delta2)
+    overall_std_delta2 = np.std(list_delta2)
+    
     # Print the results
-    print(f"Price Statistics over {iterations} iterations:")
+    print(f"Price Statistics over {iterations} trajecotories:")
     print(f"Agent 1 - Average Price: {overall_avg_p1:.4f}, Standard Deviation: {overall_std_p1:.4f}")
     print(f"Agent 2 - Average Price: {overall_avg_p2:.4f}, Standard Deviation: {overall_std_p2:.4f}\n")
     
-    print(f"Profit Statistics over {iterations} iterations:")
+    print(f"Profit Statistics over {iterations} trajecotories:")
     print(f"Agent 1 - Average Profit: {overall_avg_pi1:.4f}, Standard Deviation: {overall_std_pi1:.4f}")
-    print(f"Agent 2 - Average Profit: {overall_avg_pi2:.4f}, Standard Deviation: {overall_std_pi2:.4f}")
+    print(f"Agent 2 - Average Profit: {overall_avg_pi2:.4f}, Standard Deviation: {overall_std_pi2:.4f}\n")
+    
+    print(f"Delta Statistics over {iterations} trajecotories:")
+    print(f"Agent 1 - Average Delta: {overall_avg_delta1:.4f}, Standard Deviation of Delta: {overall_std_delta1:.4f}")
+    print(f"Agent 2 - Average Delta: {overall_avg_delta2:.4f}, Standard Deviation of Delta: {overall_std_delta2:.4f}")
     
     # Return the statistics as a dictionary
     return {
@@ -151,8 +215,13 @@ def average_price_and_profit(game, a1_list, a2_list,ts):
         'avg_profit1': overall_avg_pi1,
         'std_profit1': overall_std_pi1,
         'avg_profit2': overall_avg_pi2,
-        'std_profit2': overall_std_pi2
+        'std_profit2': overall_std_pi2,
+        'avg_delta1': overall_avg_delta1,
+        'std_delta1': overall_std_delta1,
+        'avg_delta2': overall_avg_delta2,
+        'std_delta2': overall_std_delta2
     }
+
 
 def create_directed_network_graph(adj_matrix, node_labels):
     """
@@ -588,85 +657,6 @@ def profit_graph(game, a1_lists, a2_lists):
         'upper_bound_player2': upper_bound_player2
     }
 
-
-def simulate_deviation(game, Agent1, Agent2, tdeviate, tmax, deviated_price=0, deviated_index=0, index=True):
-    """
-    Simulate a deviation in Agent1's strategy and plot the resulting actions over time.
-
-    This function forces Agent1 to set a specific price either by index or by explicit value
-    for the first `tdeviate` time steps. After the deviation period, Agent1 resumes its
-    normal strategy. The actions of both agents are recorded and plotted over the simulation period.
-
-    Parameters
-    ----------
-    game : object
-        The game environment, which must have a `compute_profits` method.
-    Agent1 : object
-        The first agent, whose actions will be deviated.
-    Agent2 : object
-        The second agent participating in the simulation.
-    tdeviate : int
-        The number of initial time steps during which Agent1's action is deviated.
-    tmax : int
-        The total number of time steps to simulate.
-    deviated_price : float, optional
-        The specific price value Agent1 should set during the deviation period. Used if `index` is False.
-        Default is 0.
-    deviated_index : int, optional
-        The index of the price in Agent1's action space to set during the deviation period.
-        Used if `index` is True. Default is 0.
-    index : bool, optional
-        Determines whether to use the `deviated_index` or `deviated_price` for deviation.
-        If True, uses `deviated_index`; otherwise, uses `deviated_price`. Default is True.
-
-    Returns
-    -------
-    None
-        Displays a plot of Agent1 and Agent2's actions over time.
-    """
-    if index:
-        fixed_price = Agent1.a1_space[deviated_index]
-    else:
-        fixed_price = deviated_price
-
-    all_actions = []
-    a1_values = []
-    a2_values = []
-
-    for t in range(int(tmax)):
-        tbig = 1000000
-
-        s = (Agent1.a_price, Agent2.a_price)
-
-        if t <= tdeviate:
-            a1 = fixed_price  
-        else:
-            a1 = Agent1.pick_strategies(game, s, tbig)
-
-        a2 = Agent2.pick_strategies(game, s[::-1], tbig)
-
-        a = (a1, a2)
-        a_prof = np.array([a1, a2])
-        all_actions.append(a)
-        a1_values.append(a1)
-        a2_values.append(a2)
-        pi1 = game.compute_profits(a_prof)
-        s = a
-
-    print(a1_values)
-    print(a2_values)
-    plt.figure(figsize=(10, 6))
-    plt.plot(range(len(a1_values)), a1_values, label='Agent 1')
-    plt.plot(range(len(a2_values)), a2_values, label='Agent 2')
-    # plt.ylim((0,game.k-1))
-    plt.xlabel('Time')
-    plt.ylabel('Action Value')
-    plt.title('Agent Actions Over Time')
-    plt.legend()
-    plt.grid(True)
-    plt.show()
-
-
 def state_heatmap(game, Agent1, Agent2, a1_list, a2_list, ts):
     """
     Generate a heatmap of joint state distributions.
@@ -751,3 +741,86 @@ def state_heatmap(game, Agent1, Agent2, a1_list, a2_list, ts):
     plt.show()
 
     return joint_state_counts  # Return counts if needed
+
+
+### VERY BUGGY, To Be fixed later
+
+# def simulate_deviation(game, Agent1, Agent2, tdeviate, tmax, deviated_price=0, deviated_index=0, index=True):
+#     """
+#     Simulate a deviation in Agent1's strategy and plot the resulting actions over time.
+
+#     This function forces Agent1 to set a specific price either by index or by explicit value
+#     for the first `tdeviate` time steps. After the deviation period, Agent1 resumes its
+#     normal strategy. The actions of both agents are recorded and plotted over the simulation period.
+
+#     Parameters
+#     ----------
+#     game : object
+#         The game environment, which must have a `compute_profits` method.
+#     Agent1 : object
+#         The first agent, whose actions will be deviated.
+#     Agent2 : object
+#         The second agent participating in the simulation.
+#     tdeviate : int
+#         The number of initial time steps during which Agent1's action is deviated.
+#     tmax : int
+#         The total number of time steps to simulate.
+#     deviated_price : float, optional
+#         The specific price value Agent1 should set during the deviation period. Used if `index` is False.
+#         Default is 0.
+#     deviated_index : int, optional
+#         The index of the price in Agent1's action space to set during the deviation period.
+#         Used if `index` is True. Default is 0.
+#     index : bool, optional
+#         Determines whether to use the `deviated_index` or `deviated_price` for deviation.
+#         If True, uses `deviated_index`; otherwise, uses `deviated_price`. Default is True.
+
+#     Returns
+#     -------
+#     None
+#         Displays a plot of Agent1 and Agent2's actions over time.
+#     """
+#     if index:
+#         fixed_price = Agent1.a1_space[deviated_index]
+#     else:
+#         fixed_price = deviated_price
+
+#     all_actions = []
+#     a1_values = []
+#     a2_values = []
+
+#     for t in range(int(tmax)):
+#         tbig = 1000000
+
+#         s = (Agent1.final_price, Agent2.final_price)
+
+#         if t <= tdeviate:
+#             a1 = fixed_price  
+#         else:
+#             a1 = Agent1.pick_strategies(game, s, tbig)
+
+#         a2 = Agent2.pick_strategies(game, s[::-1], tbig)
+
+#         a = (a1, a2)
+#         a_prof = np.array([a1, a2])
+#         all_actions.append(a)
+#         a1_values.append(a1)
+#         a2_values.append(a2)
+#         pi1 = game.compute_profits(a_prof)
+#         s = a
+
+#     print(a1_values)
+#     print(a2_values)
+#     plt.figure(figsize=(10, 6))
+#     plt.plot(range(len(a1_values)), a1_values, label='Agent 1')
+#     plt.plot(range(len(a2_values)), a2_values, label='Agent 2')
+#     # plt.ylim((0,game.k-1))
+#     plt.xlabel('Time')
+#     plt.ylabel('Action Value')
+#     plt.title('Agent Actions Over Time')
+#     plt.legend()
+#     plt.grid(True)
+#     plt.show()
+
+
+

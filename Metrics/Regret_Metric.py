@@ -74,12 +74,23 @@ def find_regret(game, Agent1, Agent2, a1_lists, a2_lists, use_loglog=False, regr
     # Determine the maximum length among all regret lists
     max_length = max(len(regret) for regret in all_regrets)
 
-    # Initialize a 2D array with NaNs
-    regret_matrix = np.full((len(all_regrets), max_length), np.nan)
+    # Initialize a 2D array without filling (will populate in the loop)
+    regret_matrix = np.empty((len(all_regrets), max_length))
 
-    # Populate the matrix with regret values
+    # Populate the matrix with regret values and fill remaining with last value
     for i, regret in enumerate(all_regrets):
-        regret_matrix[i, :len(regret)] = regret
+        current_length = len(regret)
+        regret_matrix[i, :current_length] = regret
+        if current_length < max_length:
+            # Fill the remaining entries with the last value of the regret list
+            regret_matrix[i, current_length:] = regret[-1]
+
+    # # Initialize a 2D array with NaNs
+    # regret_matrix = np.full((len(all_regrets), max_length), np.nan)
+
+    # # Populate the matrix with regret values
+    # for i, regret in enumerate(all_regrets):
+    #     regret_matrix[i, :len(regret)] = regret
 
     # Calculate mean and confidence intervals, ignoring NaNs
     mean_regret = np.nanmean(regret_matrix, axis=0)

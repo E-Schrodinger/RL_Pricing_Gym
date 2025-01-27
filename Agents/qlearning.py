@@ -43,6 +43,7 @@ class Q_Learning(QBase):
         
         self.epsilon = kwargs.get('epsilon', 0.1)
         self.beta = kwargs.get('beta', 4e-6)
+        self.final_price = None
 
         super().__init__(game, **kwargs)
 
