@@ -216,6 +216,7 @@ class Dec_Q(QBase):
                         self.adaption_phase(game, s_hat, a_hat)
                     same_q = np.allclose(old_q, self.Q[0], tol)
                     stable = (stable + same_q) * same_q
+                    stable += self.batch_size
             self.num.fill(0)
  
        
